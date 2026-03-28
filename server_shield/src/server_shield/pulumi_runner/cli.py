@@ -4,10 +4,20 @@ from pathlib import Path
 from server_shield.shared.config import get_config
 from server_shield.shared.runtime import run_component
 
+PULUMI_STACK_NAME = "server-shield"
+
 
 def _invoke_pulumi() -> int:
     project_dir = Path(__file__).resolve().parents[3] / "pulumi_project"
-    command = ["pulumi", "up", "--yes", "--cwd", str(project_dir)]
+    command = [
+        "pulumi",
+        "up",
+        "--yes",
+        "--stack",
+        PULUMI_STACK_NAME,
+        "--cwd",
+        str(project_dir),
+    ]
     return subprocess.run(command, check=False).returncode
 
 
