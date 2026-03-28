@@ -43,3 +43,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Server shield runtime state
+server_shield/state/
+server_shield/domains.txt
+server_shield/hosted_zone_domain.txt
+server_shield/nlb_ip.txt
