@@ -289,7 +289,7 @@ def run_program() -> None:
                     path="/shield_manifest.json",
                     protocol="HTTPS",
                     port="443",
-                    status_code="HTTP_303",
+                    status_code="HTTP_302",
                 ),
             )
         ],

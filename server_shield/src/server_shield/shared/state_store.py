@@ -1,92 +1,122 @@
 import json
 from pathlib import Path
+import shutil
 from tempfile import NamedTemporaryFile
 
-from server_shield.shared.state import (
-    BlacklistState,
-    DesiredDomainsState,
-    HostedZoneDomainState,
-    ManifestState,
-    NlbIpState,
+from server_shield.shared.state import BlacklistState, DesiredDomainsState, HostedZoneDomainState, ManifestState, NlbIpState
+
+
+DEFAULT_STATE_DIR = Path(__file__).resolve().parent / "state_files"
+STATE_FILE_NAMES = (
+    "hosted_zone_domain.json",
+    "nlb_ip.json",
+    "desired_domains.json",
+    "blacklist.json",
+    "manifest.json",
 )
 
 
-DEFAULT_STATE_FILES = {
-    "hosted_zone_domain.json": HostedZoneDomainState(),
-    "nlb_ip.json": NlbIpState(),
-    "desired_domains.json": DesiredDomainsState(),
-    "blacklist.json": BlacklistState(),
-    "manifest.json": ManifestState(),
-}
-
-
-def ensure_state_files(state_dir: Path) -> None:
-    state_dir.mkdir(parents=True, exist_ok=True)
-    for file_name, model in DEFAULT_STATE_FILES.items():
-        path = state_dir / file_name
+def ensure_state_files(state_dir: Path | None = None) -> None:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    resolved_state_dir.mkdir(parents=True, exist_ok=True)
+    for file_name in STATE_FILE_NAMES:
+        path = resolved_state_dir / file_name
         if not path.exists():
-            _atomic_write(path, model.model_dump())
+            _copy_example_state_file(file_name, resolved_state_dir)
 
 
-def read_desired_domains(state_dir: Path) -> DesiredDomainsState:
-    ensure_state_files(state_dir)
-    return DesiredDomainsState.model_validate_json((state_dir / "desired_domains.json").read_text())
+def read_desired_domains(state_dir: Path | None = None) -> DesiredDomainsState:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
+    return DesiredDomainsState.model_validate_json((resolved_state_dir / "desired_domains.json").read_text())
 
 
-def write_desired_domains(state_dir: Path, domains: list[str]) -> None:
-    ensure_state_files(state_dir)
-    _atomic_write(state_dir / "desired_domains.json", DesiredDomainsState(domains=domains).model_dump())
-
-
-def read_nlb_ip(state_dir: Path) -> NlbIpState:
-    ensure_state_files(state_dir)
-    return NlbIpState.model_validate_json((state_dir / "nlb_ip.json").read_text())
-
-
-def write_nlb_ip(state_dir: Path, ip: str | None) -> None:
-    ensure_state_files(state_dir)
-    _atomic_write(state_dir / "nlb_ip.json", NlbIpState(ip=ip).model_dump())
-
-
-def write_hosted_zone_domain(state_dir: Path, domain: str | None) -> None:
-    ensure_state_files(state_dir)
+def write_desired_domains(state_dir: Path | None = None, domains: list[str] | None = None) -> None:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
     _atomic_write(
-        state_dir / "hosted_zone_domain.json",
+        resolved_state_dir / "desired_domains.json",
+        DesiredDomainsState(domains=domains or []).model_dump(),
+    )
+
+
+def read_nlb_ip(state_dir: Path | None = None) -> NlbIpState:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
+    return NlbIpState.model_validate_json((resolved_state_dir / "nlb_ip.json").read_text())
+
+
+def write_nlb_ip(state_dir: Path | None = None, ip: str | None = None) -> None:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
+    _atomic_write(resolved_state_dir / "nlb_ip.json", NlbIpState(ip=ip).model_dump())
+
+
+def write_hosted_zone_domain(state_dir: Path | None = None, domain: str | None = None) -> None:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
+    _atomic_write(
+        resolved_state_dir / "hosted_zone_domain.json",
         HostedZoneDomainState(domain=domain).model_dump(),
     )
 
 
-def read_hosted_zone_domain(state_dir: Path) -> HostedZoneDomainState:
-    ensure_state_files(state_dir)
+def read_hosted_zone_domain(state_dir: Path | None = None) -> HostedZoneDomainState:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
     return HostedZoneDomainState.model_validate_json(
-        (state_dir / "hosted_zone_domain.json").read_text()
+        (resolved_state_dir / "hosted_zone_domain.json").read_text()
     )
 
 
-def read_blacklist(state_dir: Path) -> BlacklistState:
-    ensure_state_files(state_dir)
-    return BlacklistState.model_validate_json((state_dir / "blacklist.json").read_text())
+def read_blacklist(state_dir: Path | None = None) -> BlacklistState:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
+    return BlacklistState.model_validate_json((resolved_state_dir / "blacklist.json").read_text())
 
 
-def write_blacklist(state_dir: Path, domains: list[str]) -> None:
-    ensure_state_files(state_dir)
-    _atomic_write(state_dir / "blacklist.json", BlacklistState(domains=domains).model_dump())
-
-
-def write_manifest(state_dir: Path, manifest_url: str | None, encrypted_addresses: list[str]) -> None:
-    ensure_state_files(state_dir)
+def write_blacklist(state_dir: Path | None = None, domains: list[str] | None = None) -> None:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
     _atomic_write(
-        state_dir / "manifest.json",
+        resolved_state_dir / "blacklist.json",
+        BlacklistState(domains=domains or []).model_dump(),
+    )
+
+
+def write_manifest(
+    state_dir: Path | None = None,
+    manifest_url: str | None = None,
+    encrypted_addresses: list[str] | None = None,
+) -> None:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
+    _atomic_write(
+        resolved_state_dir / "manifest.json",
         ManifestState(
             manifest_url=manifest_url,
-            encrypted_addresses=encrypted_addresses,
+            encrypted_addresses=encrypted_addresses or [],
         ).model_dump(),
     )
 
 
-def read_manifest(state_dir: Path) -> ManifestState:
-    ensure_state_files(state_dir)
-    return ManifestState.model_validate_json((state_dir / "manifest.json").read_text())
+def read_manifest(state_dir: Path | None = None) -> ManifestState:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    ensure_state_files(resolved_state_dir)
+    return ManifestState.model_validate_json((resolved_state_dir / "manifest.json").read_text())
+
+
+def _resolve_state_dir(state_dir: Path | None) -> Path:
+    if state_dir is None:
+        return DEFAULT_STATE_DIR
+    return state_dir
+
+
+def _copy_example_state_file(file_name: str, state_dir: Path) -> None:
+    example_path = DEFAULT_STATE_DIR / file_name.replace(".json", ".example.json")
+    if not example_path.exists():
+        raise FileNotFoundError(f"Missing state example file: {example_path}")
+    shutil.copyfile(example_path, state_dir / file_name)
 
 
 def _atomic_write(path: Path, payload: dict[str, object]) -> None:
