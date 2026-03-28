@@ -33,3 +33,11 @@ def test_build_waf_rules_adds_host_rule_for_each_domain() -> None:
     assert len(statements) == 2
     assert statements[0].byte_match_statement.search_string == "miner-a.example.com"
     assert statements[1].byte_match_statement.search_string == "miner-b.example.com"
+
+
+def test_build_waf_rules_uses_direct_match_for_single_domain() -> None:
+    rules = build_waf_rules(["miner.example.com"])
+
+    assert [rule.name for rule in rules] == ["allow-predefined-domains", "allow-manifest"]
+    assert rules[0].statement.byte_match_statement.search_string == "miner.example.com"
+    assert rules[0].statement.or_statement is None

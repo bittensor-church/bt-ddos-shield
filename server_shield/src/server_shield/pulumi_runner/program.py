@@ -45,6 +45,49 @@ def build_waf_rule_names(desired_domains: list[str]) -> list[str]:
 def build_waf_rules(desired_domains: list[str]) -> list[WebAclRuleArgs]:
     waf_rules: list[WebAclRuleArgs] = []
     if should_create_domain_allow_rule(desired_domains):
+        if len(desired_domains) == 1:
+            domain_statement = WebAclRuleStatementArgs(
+                byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
+                    search_string=desired_domains[0],
+                    positional_constraint="EXACTLY",
+                    field_to_match=WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
+                        single_header=WebAclRuleStatementByteMatchStatementFieldToMatchSingleHeaderArgs(
+                            name="host",
+                        ),
+                    ),
+                    text_transformations=[
+                        WebAclRuleStatementByteMatchStatementTextTransformationArgs(
+                            priority=0,
+                            type="LOWERCASE",
+                        ),
+                    ],
+                )
+            )
+        else:
+            domain_statement = WebAclRuleStatementArgs(
+                or_statement=WebAclRuleStatementOrStatementArgs(
+                    statements=[
+                        WebAclRuleStatementArgs(
+                            byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
+                                search_string=domain,
+                                positional_constraint="EXACTLY",
+                                field_to_match=WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
+                                    single_header=WebAclRuleStatementByteMatchStatementFieldToMatchSingleHeaderArgs(
+                                        name="host",
+                                    ),
+                                ),
+                                text_transformations=[
+                                    WebAclRuleStatementByteMatchStatementTextTransformationArgs(
+                                        priority=0,
+                                        type="LOWERCASE",
+                                    ),
+                                ],
+                            )
+                        )
+                        for domain in desired_domains
+                    ],
+                )
+            )
         waf_rules.append(
             WebAclRuleArgs(
                 name="allow-predefined-domains",
@@ -55,30 +98,7 @@ def build_waf_rules(desired_domains: list[str]) -> list[WebAclRuleArgs]:
                     cloudwatch_metrics_enabled=False,
                     metric_name="allow-predefined-domains",
                 ),
-                statement=WebAclRuleStatementArgs(
-                    or_statement=WebAclRuleStatementOrStatementArgs(
-                        statements=[
-                            WebAclRuleStatementArgs(
-                                byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
-                                    search_string=domain,
-                                    positional_constraint="EXACTLY",
-                                    field_to_match=WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
-                                        single_header=WebAclRuleStatementByteMatchStatementFieldToMatchSingleHeaderArgs(
-                                            name="host",
-                                        ),
-                                    ),
-                                    text_transformations=[
-                                        WebAclRuleStatementByteMatchStatementTextTransformationArgs(
-                                            priority=0,
-                                            type="LOWERCASE",
-                                        ),
-                                    ],
-                                )
-                            )
-                            for domain in desired_domains
-                        ],
-                    )
-                ),
+                statement=domain_statement,
             )
         )
     waf_rules.append(
