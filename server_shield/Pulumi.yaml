@@ -1,0 +1,6 @@
+name: server-shield
+runtime:
+  name: python
+  options:
+    toolchain: uv
+description: Server Shield - Pulumi infrastructure

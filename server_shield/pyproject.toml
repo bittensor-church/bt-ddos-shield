@@ -1,0 +1,10 @@
+[project]
+name = "server-shield"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "pulumi>=3.228.0",
+    "pulumi-aws>=7.23.0",
+    "python-dotenv>=1.2.2",
+]

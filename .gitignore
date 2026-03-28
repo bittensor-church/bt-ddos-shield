@@ -1,0 +1,45 @@
+# Environment variables
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# PyCharm
+.idea/
+
+# Pulumi
+.pulumi/
+Pulumi.*.yaml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
