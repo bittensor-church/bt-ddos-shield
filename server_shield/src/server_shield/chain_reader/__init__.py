@@ -1,0 +1,1 @@
+"""Chain reader component."""

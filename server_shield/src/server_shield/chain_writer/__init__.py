@@ -1,0 +1,1 @@
+"""Chain writer component."""
