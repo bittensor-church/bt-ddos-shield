@@ -270,6 +270,8 @@ Requirements:
 - no-op when `SENTRY_DSN` is unset
 - tag events with component name and environment
 - safe to call on every scheduled run
+- uncaught exceptions from any component must be reported to Sentry when `SENTRY_DSN` is set
+- non-zero component exits must also result in a Sentry event when `SENTRY_DSN` is set
 
 This keeps error reporting consistent without duplicating setup code.
 
@@ -332,6 +334,9 @@ Behavior of `run_component_with_lock_and_timeout`:
 - if lock acquisition fails, log that the run was skipped and return success
 - if lock acquisition succeeds, execute the component command under a 20-minute timeout
 - always release the lock on exit
+- write logs to stdout/stderr so output from all three component loops is visible via `docker logs`
+- prefix or otherwise identify log lines by component so interleaved output remains attributable
+- when a component exits non-zero and `SENTRY_DSN` is set, emit a Sentry event before returning control to the loop
 
 Rationale:
 - easier to run correctly in containers than system cron
@@ -350,6 +355,7 @@ Expected responsibilities:
 - install Pulumi CLI
 - expose runtime environment variables to all components
 - start the scheduler/supervisor entrypoint on container startup
+- keep all component logs on the container's standard output/error streams so `docker logs` shows Pulumi runner, chain reader, and chain writer activity in one place
 
 The image should run all three components, not require separate images per component.
 
@@ -397,6 +403,8 @@ Add tests covering:
 - chain writer fast clean exit when `nlb_ip.ip` is `null`
 - chain writer non-skip path when `nlb_ip.ip` has a value
 - lock/timeout runner behavior if practical at the unit or shell level
+- Sentry capture behavior for uncaught exceptions and non-zero exits when `SENTRY_DSN` is configured
+- logging behavior sufficient to show component-attributed output on stdout/stderr
 
 ## Migration Notes
 
@@ -444,6 +452,8 @@ This work is complete when:
 - Pulumi files live under a dedicated subdirectory inside `server_shield`
 - inter-component state uses JSON plus Pydantic schemas with null/empty bootstrap defaults
 - shared config and Sentry initialization are used by all three components
+- logs from all three components are visible through `docker logs` and remain attributable to the originating component
+- uncaught exceptions and non-zero exits are sent to Sentry when `SENTRY_DSN` is configured
 - chain reader and chain writer are placeholder commands with correct bootstrap and skip behavior
 - runtime state files are gitignored
 - README architecture documentation matches the new model
