@@ -27,3 +27,7 @@ def _run_once(state_dir: Path) -> int:
 def main() -> int:
     config = get_config()
     return run_component("chain-reader", lambda: _run_once(config.state_dir))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

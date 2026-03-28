@@ -14,3 +14,7 @@ def _invoke_pulumi() -> int:
 def main() -> int:
     get_config()
     return run_component("pulumi-runner", _invoke_pulumi)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
