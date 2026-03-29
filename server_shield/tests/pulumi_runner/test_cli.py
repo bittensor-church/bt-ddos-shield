@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from server_shield.pulumi_runner.cli import _invoke_pulumi
+from server_shield.pulumi_runner.cli import _invoke_pulumi, main
 
 
 def test_invoke_pulumi_uses_fixed_stack(monkeypatch) -> None:
@@ -25,3 +25,20 @@ def test_invoke_pulumi_uses_fixed_stack(monkeypatch) -> None:
         "--cwd",
         str(Path(__file__).resolve().parents[2] / "pulumi_project"),
     ]]
+
+
+def test_pulumi_runner_main_does_not_require_state_dir(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "server_shield.pulumi_runner.cli.get_config",
+        lambda: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "server_shield.pulumi_runner.cli._invoke_pulumi",
+        lambda: 0,
+    )
+    monkeypatch.setattr(
+        "server_shield.pulumi_runner.cli.run_component",
+        lambda component_name, fn: fn(),
+    )
+
+    assert main() == 0

@@ -1,9 +1,7 @@
 from functools import lru_cache
-from pathlib import Path
 
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from server_shield.shared.state_store import DEFAULT_STATE_DIR
 
 
 class PulumiSettings(BaseModel):
@@ -35,7 +33,6 @@ class AppConfig(BaseSettings):
     env: str = "dev"
     log_level: str = "INFO"
     sentry_dsn: str | None = None
-    state_dir: Path = DEFAULT_STATE_DIR
     pulumi: PulumiSettings
     chain_reader: ChainReaderSettings = ChainReaderSettings()
     chain_writer: ChainWriterSettings = ChainWriterSettings()

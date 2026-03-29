@@ -6,7 +6,6 @@ from server_shield.shared.config import get_config
 def test_get_config_reads_nested_environment(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("SERVER_SHIELD_ENV", "test")
     monkeypatch.setenv("SERVER_SHIELD_LOG_LEVEL", "DEBUG")
-    monkeypatch.setenv("SERVER_SHIELD_STATE_DIR", str(tmp_path / "state"))
     monkeypatch.setenv("SERVER_SHIELD_PULUMI__AWS_REGION", "eu-north-1")
     monkeypatch.setenv("SERVER_SHIELD_PULUMI__HOSTED_ZONE_ID", "Z123")
     monkeypatch.setenv("SERVER_SHIELD_PULUMI__MINER_INSTANCE_ID", "i-123")
@@ -22,7 +21,7 @@ def test_get_config_reads_nested_environment(monkeypatch, tmp_path: Path) -> Non
     config = get_config()
 
     assert config.env == "test"
-    assert config.state_dir == tmp_path / "state"
+    assert not hasattr(config, "state_dir")
     assert config.pulumi.aws_region == "eu-north-1"
     assert config.chain_reader.netuid == 12
     assert config.chain_writer.wallet_name == "miner"

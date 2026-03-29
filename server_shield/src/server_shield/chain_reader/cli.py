@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from server_shield.shared.config import get_config
 from server_shield.shared.runtime import run_component
 from server_shield.shared.state_store import (
@@ -11,12 +9,12 @@ from server_shield.shared.state_store import (
 )
 
 
-def _run_once(state_dir: Path) -> int:
-    ensure_state_files(state_dir)
-    hosted_zone = read_hosted_zone_domain(state_dir)
-    blacklist = read_blacklist(state_dir)
-    write_desired_domains(state_dir, [])
-    write_manifest(state_dir, None, [])
+def _run_once() -> int:
+    ensure_state_files()
+    hosted_zone = read_hosted_zone_domain()
+    blacklist = read_blacklist()
+    write_desired_domains(domains=[])
+    write_manifest(manifest_url=None, encrypted_addresses=[])
     print(
         f"hello from chain_reader hosted_zone={hosted_zone.domain!r} blacklist_size={len(blacklist.domains)}",
         flush=True,
@@ -25,8 +23,8 @@ def _run_once(state_dir: Path) -> int:
 
 
 def main() -> int:
-    config = get_config()
-    return run_component("chain-reader", lambda: _run_once(config.state_dir))
+    get_config()
+    return run_component("chain-reader", _run_once)
 
 
 if __name__ == "__main__":

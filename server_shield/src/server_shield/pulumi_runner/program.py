@@ -133,7 +133,7 @@ def build_waf_rules(desired_domains: list[str]) -> list[WebAclRuleArgs]:
 
 def run_program() -> None:
     config = get_config()
-    desired_domains = read_desired_domains(config.state_dir).domains
+    desired_domains = read_desired_domains().domains
     miner_instance_id = config.pulumi.miner_instance_id
     miner_port = config.pulumi.miner_port
     hosted_zone_id = config.pulumi.hosted_zone_id
@@ -143,7 +143,7 @@ def run_program() -> None:
     hosted_zone = aws.route53.get_zone(zone_id=hosted_zone_id)
     zone_domain = hosted_zone.name.rstrip(".")
     pulumi.log.info(f"Hosted zone domain: {zone_domain}")
-    write_hosted_zone_domain(config.state_dir, zone_domain)
+    write_hosted_zone_domain(domain=zone_domain)
 
     miner_instance = aws.ec2.get_instance(instance_id=miner_instance_id)
     miner_subnet = aws.ec2.get_subnet(id=miner_instance.subnet_id)
@@ -410,7 +410,7 @@ def run_program() -> None:
         ],
     )
 
-    nlb_eip.public_ip.apply(lambda ip: _write_nlb_ip(config.state_dir, ip))
+    nlb_eip.public_ip.apply(_write_nlb_ip)
 
     pulumi.export("bucket_name", bucket.bucket)
     pulumi.export("bucket_regional_domain", bucket.bucket_regional_domain_name)
@@ -422,6 +422,6 @@ def run_program() -> None:
     pulumi.export("waf_rule_names", build_waf_rule_names(desired_domains))
 
 
-def _write_nlb_ip(state_dir: Path, ip: str) -> str:
-    write_nlb_ip(state_dir, ip)
+def _write_nlb_ip(ip: str) -> str:
+    write_nlb_ip(ip=ip)
     return ip

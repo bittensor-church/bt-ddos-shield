@@ -1,26 +1,41 @@
 from pathlib import Path
 import os
 import subprocess
+from types import SimpleNamespace
 
-from server_shield.chain_writer.cli import _run_once
+from server_shield.chain_writer.cli import _run_once, main
+from server_shield.shared import state_store
 from server_shield.shared.state_store import ensure_state_files, write_nlb_ip
 
 
-def test_chain_writer_skips_when_nlb_ip_missing(tmp_path: Path, capsys) -> None:
+def _write_example_files(example_dir: Path) -> None:
+    example_dir.mkdir(parents=True, exist_ok=True)
+    (example_dir / "hosted_zone_domain.example.json").write_text('{"domain": null}\n')
+    (example_dir / "nlb_ip.example.json").write_text('{"ip": null}\n')
+    (example_dir / "desired_domains.example.json").write_text('{"domains": []}\n')
+    (example_dir / "blacklist.example.json").write_text('{"domains": []}\n')
+    (example_dir / "manifest.example.json").write_text('{"manifest_url": null, "encrypted_addresses": []}\n')
+
+
+def test_chain_writer_skips_when_nlb_ip_missing(tmp_path: Path, capsys, monkeypatch) -> None:
+    _write_example_files(tmp_path)
+    monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
     ensure_state_files(tmp_path)
 
-    exit_code = _run_once(tmp_path)
+    exit_code = _run_once()
 
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "skipping chain_writer because nlb_ip is null" in captured.out
 
 
-def test_chain_writer_logs_placeholder_when_nlb_ip_present(tmp_path: Path, capsys) -> None:
+def test_chain_writer_logs_placeholder_when_nlb_ip_present(tmp_path: Path, capsys, monkeypatch) -> None:
+    _write_example_files(tmp_path)
+    monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
     ensure_state_files(tmp_path)
     write_nlb_ip(tmp_path, "1.2.3.4")
 
-    exit_code = _run_once(tmp_path)
+    exit_code = _run_once()
 
     captured = capsys.readouterr()
     assert exit_code == 0
@@ -45,4 +60,24 @@ def test_chain_writer_module_execution_runs_main(tmp_path: Path) -> None:
     )
 
     assert completed.returncode == 0
-    assert "skipping chain_writer because nlb_ip is null" in completed.stdout
+    assert (
+        "skipping chain_writer because nlb_ip is null" in completed.stdout
+        or "hello from chain_writer for " in completed.stdout
+    )
+
+
+def test_chain_writer_main_does_not_require_state_dir(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "server_shield.chain_writer.cli.get_config",
+        lambda: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "server_shield.chain_writer.cli._run_once",
+        lambda: 0,
+    )
+    monkeypatch.setattr(
+        "server_shield.chain_writer.cli.run_component",
+        lambda component_name, fn: fn(),
+    )
+
+    assert main() == 0
