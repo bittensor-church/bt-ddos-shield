@@ -10,4 +10,4 @@ set -a
 source "${env_file}"
 set +a
 
-PULUMI_CONFIG_PASSPHRASE="" exec pulumi destroy --cwd "${project_dir}"
+exec pulumi destroy --cwd "${project_dir}"
