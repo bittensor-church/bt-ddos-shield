@@ -37,10 +37,14 @@ def test_chain_reader_module_execution_runs_main(tmp_path: Path) -> None:
         env={
             **os.environ,
             "SERVER_SHIELD_STATE_DIR": str(tmp_path),
-            "SERVER_SHIELD_PULUMI__AWS_REGION": "eu-north-1",
-            "SERVER_SHIELD_PULUMI__HOSTED_ZONE_ID": "Z123",
-            "SERVER_SHIELD_PULUMI__MINER_INSTANCE_ID": "i-123",
-            "SERVER_SHIELD_PULUMI__MINER_PORT": "9001",
+            "SERVER_SHIELD_PULUMI__BACKEND_URL": "file:///tmp/server-shield-test-state",
+            "SERVER_SHIELD_PULUMI__SHIELD_BACKEND": "AWS",
+            "SERVER_SHIELD_MINER_PORT": "9001",
+            "SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID": "key",
+            "SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY": "secret",
+            "SERVER_SHIELD_PULUMI__AWS__AWS_REGION": "eu-north-1",
+            "SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID": "Z123",
+            "SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID": "i-123",
         },
     )
 

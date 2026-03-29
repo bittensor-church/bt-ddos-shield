@@ -118,3 +118,56 @@ Behavior notes:
 - Logs from all three components stay on stdout/stderr, so they are visible through `docker logs`.
 - Uncaught exceptions and non-zero exits are reported to Sentry when `SENTRY_DSN` is configured.
 - Configuration is parsed from environment variables via shared Pydantic settings; the application code does not load `.env` files directly.
+
+Build the Docker image from the repository root with:
+
+```bash
+docker build -f server_shield/Dockerfile -t server-shield:local .
+```
+
+Pulumi backend configuration is mandatory. Set `SERVER_SHIELD_PULUMI__BACKEND_URL` in your environment.
+
+Local file backend example:
+
+```dotenv
+SERVER_SHIELD_PULUMI__BACKEND_URL=file:///var/lib/server-shield/pulumi-state
+SERVER_SHIELD_PULUMI__STACK_NAME=server-shield
+SERVER_SHIELD_PULUMI__SHIELD_BACKEND=AWS
+SERVER_SHIELD_MINER_PORT=9001
+SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID=...
+SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY=...
+SERVER_SHIELD_PULUMI__AWS__AWS_REGION=eu-north-1
+SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID=...
+SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID=...
+```
+
+Run the container with a persistent Pulumi state volume:
+
+```bash
+docker run \
+  --env-file .env \
+  --volume server-shield-pulumi-state:/var/lib/server-shield/pulumi-state \
+  server-shield:local
+```
+
+S3 backend example:
+
+```dotenv
+SERVER_SHIELD_PULUMI__BACKEND_URL=s3://my-pulumi-state-bucket/server-shield
+SERVER_SHIELD_PULUMI__STACK_NAME=server-shield
+SERVER_SHIELD_PULUMI__SHIELD_BACKEND=AWS
+SERVER_SHIELD_MINER_PORT=9001
+SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID=...
+SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY=...
+SERVER_SHIELD_PULUMI__AWS__AWS_REGION=eu-north-1
+SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID=...
+SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID=...
+```
+
+Run the container against the S3 backend:
+
+```bash
+docker run --env-file .env server-shield:local
+```
+
+The build command must be run from the repository root so `COPY server_shield ...` in the Dockerfile can see the project files. For the local file backend, `/var/lib/server-shield/pulumi-state` must be persisted with a Docker volume. For the S3 backend, the bucket must already exist. `SERVER_SHIELD_PULUMI__STACK_NAME` is optional and defaults to `server-shield`. `SERVER_SHIELD_PULUMI__SHIELD_BACKEND` is currently required and must be `AWS`.

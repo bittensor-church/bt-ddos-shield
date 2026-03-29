@@ -134,9 +134,9 @@ def build_waf_rules(desired_domains: list[str]) -> list[WebAclRuleArgs]:
 def run_program() -> None:
     config = get_config()
     desired_domains = read_desired_domains().domains
-    miner_instance_id = config.pulumi.miner_instance_id
-    miner_port = config.pulumi.miner_port
-    hosted_zone_id = config.pulumi.hosted_zone_id
+    miner_instance_id = config.pulumi.aws.miner_instance_id
+    miner_port = config.miner_port
+    hosted_zone_id = config.pulumi.aws.hosted_zone_id
 
     pulumi.log.info(f"Loaded {len(desired_domains)} domain(s) from state store")
 
