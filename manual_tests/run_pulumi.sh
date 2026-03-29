@@ -10,4 +10,7 @@ set -a
 source "${env_file}"
 set +a
 
-exec pulumi up --cwd "${project_dir}"
+mkdir -p /tmp/pulumi-state
+cd "$script_dir"/..
+cd server_shield
+exec uv run python -m server_shield.shared.supervisor local-dev-pulumi server-shield-pulumi

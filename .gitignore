@@ -47,7 +47,5 @@ Thumbs.db
 server_shield/state/
 server_shield/src/server_shield/shared/state_files/*.json
 !server_shield/src/server_shield/shared/state_files/*.example.json
-server_shield/domains.txt
-server_shield/hosted_zone_domain.txt
-server_shield/nlb_ip.txt
-Pulumi.dev.yaml
+server_shield/pulumi_project/Pulumi.*.yaml
+!server_shield/pulumi_project/Pulumi.yaml
