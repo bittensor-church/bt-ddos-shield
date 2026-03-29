@@ -1,11 +1,11 @@
 from pydantic import BaseModel, Field
 
 
-class HostedZoneDomainState(BaseModel):
+class RootDomainState(BaseModel):
     domain: str | None = None
 
 
-class NlbIpState(BaseModel):
+class AxonPublicIpState(BaseModel):
     ip: str | None = None
 
 
