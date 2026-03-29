@@ -4,11 +4,11 @@ version = "0.1.0"
 description = "Server-side BT DDoS Shield components"
 requires-python = ">=3.14"
 dependencies = [
-    "pulumi>=3.228.0",
-    "pulumi-aws>=7.23.0",
-    "pydantic>=2.11.0",
-    "pydantic-settings>=2.11.0",
-    "sentry-sdk>=2.27.0",
+    "pulumi>=3,<4",
+    "pulumi-aws>=7,<8",
+    "pydantic>=2,<3",
+    "pydantic-settings>=2,<3",
+    "sentry-sdk>=2,<3",
 ]
 
 [project.scripts]
@@ -18,7 +18,7 @@ server-shield-chain-writer = "server_shield.chain_writer.cli:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.0",
+    "pytest>=9,<10",
 ]
 
 [build-system]
