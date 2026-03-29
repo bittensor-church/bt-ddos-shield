@@ -5,12 +5,13 @@ from types import SimpleNamespace
 
 from server_shield.chain_reader.cli import _run_once, main
 from server_shield.shared import state_store
+from server_shield.shared.state_store import read_root_domain
 
 
 def _write_example_files(example_dir: Path) -> None:
     example_dir.mkdir(parents=True, exist_ok=True)
-    (example_dir / "hosted_zone_domain.example.json").write_text('{"domain": null}\n')
-    (example_dir / "nlb_ip.example.json").write_text('{"ip": null}\n')
+    (example_dir / "root_domain.example.json").write_text('{"domain": null}\n')
+    (example_dir / "axon_public_ip.example.json").write_text('{"ip": null}\n')
     (example_dir / "desired_domains.example.json").write_text('{"domains": []}\n')
     (example_dir / "blacklist.example.json").write_text('{"domains": []}\n')
     (example_dir / "manifest.example.json").write_text('{"manifest_url": null, "encrypted_addresses": []}\n')
@@ -20,9 +21,11 @@ def test_chain_reader_bootstraps_state_and_exits_zero(tmp_path: Path, capsys, mo
     _write_example_files(tmp_path)
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
     exit_code = _run_once()
+    root_domain = read_root_domain(tmp_path)
 
     captured = capsys.readouterr()
     assert exit_code == 0
+    assert root_domain.domain is None
     assert "hello from chain_reader" in captured.out
     assert (tmp_path / "desired_domains.json").exists()
 

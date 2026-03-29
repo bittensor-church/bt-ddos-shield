@@ -104,8 +104,8 @@ These components communicate through typed JSON state files stored in the server
 
 Current state files:
 
-- `hosted_zone_domain.json`: `{ "domain": null }`
-- `nlb_ip.json`: `{ "ip": null }`
+- `root_domain.json`: `{ "domain": null }`
+- `axon_public_ip.json`: `{ "ip": null }`
 - `desired_domains.json`: `{ "domains": [] }`
 - `blacklist.json`: `{ "domains": [] }`
 - `manifest.json`: `{ "manifest_url": null, "encrypted_addresses": [] }`
@@ -113,7 +113,7 @@ Current state files:
 Behavior notes:
 
 - If `desired_domains.json` contains no domains, the Pulumi runner still applies the base infrastructure and skips the host-based WAF allow rules.
-- If `nlb_ip.json` still contains `null`, the chain writer exits cleanly and does nothing.
+- If `axon_public_ip.json` still contains `null`, the chain writer exits cleanly and does nothing.
 - All three components run in one Docker image, attempt one run every minute, never overlap with themselves, and each run is capped at 20 minutes.
 - Logs from all three components stay on stdout/stderr, so they are visible through `docker logs`.
 - Uncaught exceptions and non-zero exits are reported to Sentry when `SENTRY_DSN` is configured.

@@ -25,8 +25,8 @@ from pulumi_aws.wafv2._inputs import (
 from server_shield.shared.config import get_config
 from server_shield.shared.state_store import (
     read_desired_domains,
-    write_hosted_zone_domain,
-    write_nlb_ip,
+    write_axon_public_ip,
+    write_root_domain,
 )
 
 
@@ -143,7 +143,7 @@ def run_program() -> None:
     hosted_zone = aws.route53.get_zone(zone_id=hosted_zone_id)
     zone_domain = hosted_zone.name.rstrip(".")
     pulumi.log.info(f"Hosted zone domain: {zone_domain}")
-    write_hosted_zone_domain(domain=zone_domain)
+    write_root_domain(domain=zone_domain)
 
     miner_instance = aws.ec2.get_instance(instance_id=miner_instance_id)
     miner_subnet = aws.ec2.get_subnet(id=miner_instance.subnet_id)
@@ -410,7 +410,7 @@ def run_program() -> None:
         ],
     )
 
-    nlb_eip.public_ip.apply(_write_nlb_ip)
+    nlb_eip.public_ip.apply(_write_axon_public_ip)
 
     pulumi.export("bucket_name", bucket.bucket)
     pulumi.export("bucket_regional_domain", bucket.bucket_regional_domain_name)
@@ -422,6 +422,6 @@ def run_program() -> None:
     pulumi.export("waf_rule_names", build_waf_rule_names(desired_domains))
 
 
-def _write_nlb_ip(ip: str) -> str:
-    write_nlb_ip(ip=ip)
+def _write_axon_public_ip(ip: str) -> str:
+    write_axon_public_ip(ip=ip)
     return ip
