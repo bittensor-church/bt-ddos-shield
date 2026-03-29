@@ -15,9 +15,7 @@ server_shield/.env
 server_shield/.pytest_cache
 server_shield/.venv
 server_shield/__pycache__
-server_shield/state
-server_shield/domains.txt
-server_shield/hosted_zone_domain.txt
-server_shield/nlb_ip.txt
 server_shield/pulumi_project/Pulumi.*.yaml
 !server_shield/pulumi_project/Pulumi.yaml
+server_shield/src/server_shield/shared/state_files/*.json
+!server_shield/src/server_shield/shared/state_files/*.example.json
