@@ -43,6 +43,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Local git worktrees
+.worktrees/
+
 # Server shield runtime state
 server_shield/state/
 server_shield/src/server_shield/shared/state_files/*.json
