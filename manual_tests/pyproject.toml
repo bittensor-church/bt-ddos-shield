@@ -1,0 +1,8 @@
+[project]
+name = "manual-tests"
+version = "0.1.0"
+description = "Manual tests for bt ddos shield"
+requires-python = ">=3.14"
+dependencies = [
+    "bittensor-cli",
+]
