@@ -6,8 +6,7 @@ from server_shield.shared.config import get_config
 from server_shield.shared.runtime import run_component
 
 
-def _build_pulumi_env() -> dict[str, str]:
-    config = get_config()
+def _build_pulumi_env(config: object) -> dict[str, str]:
     env = dict(os.environ)
     env["PULUMI_CONFIG_PASSPHRASE"] = ""
     if config.pulumi.shield_backend == "AWS":
@@ -18,10 +17,14 @@ def _build_pulumi_env() -> dict[str, str]:
     return env
 
 
+def _project_dir() -> Path:
+    return Path(__file__).resolve().parents[3] / "pulumi_project"
+
+
 def _invoke_pulumi() -> int:
     config = get_config()
-    pulumi_env = _build_pulumi_env()
-    project_dir = Path(__file__).resolve().parents[3] / "pulumi_project"
+    pulumi_env = _build_pulumi_env(config)
+    project_dir = _project_dir()
     login_command = [
         "pulumi",
         "login",
