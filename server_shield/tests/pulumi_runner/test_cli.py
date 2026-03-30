@@ -163,3 +163,25 @@ def test_pulumi_shell_main_passes_arguments(monkeypatch) -> None:
     from server_shield.pulumi_runner.shell import main as shell_main
 
     assert shell_main(["refresh"]) == 17
+
+
+def test_invoke_pulumi_cli_prints_manual_recovery_hint_on_failure(
+    monkeypatch,
+    capsys,
+) -> None:
+    responses = iter([0, 0, 1])
+
+    def fake_run(command: list[str], check: bool, env: dict[str, str] | None = None) -> SimpleNamespace:
+        return SimpleNamespace(returncode=next(responses))
+
+    config = _config()
+    monkeypatch.setattr("server_shield.pulumi_runner.cli.get_config", lambda: config)
+    monkeypatch.setattr("server_shield.pulumi_runner.cli.subprocess.run", fake_run)
+
+    exit_code = invoke_pulumi_cli(["up", "--yes", "--stack", config.pulumi.stack_name])
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "shield-pulumi" in captured.err
+    assert "pulumi refresh" in captured.err
+    assert "pulumi import" in captured.err

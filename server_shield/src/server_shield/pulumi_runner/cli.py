@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 from server_shield.shared.config import get_config
@@ -19,6 +20,16 @@ def _build_pulumi_env(config: object) -> dict[str, str]:
 
 def _project_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "pulumi_project"
+
+
+def _print_manual_recovery_hint() -> None:
+    print(
+        "pulumi-runner failed. Operators can run manual Pulumi commands inside the container with "
+        "`docker exec <container-name> shield-pulumi ...`. Useful manual recovery tools include "
+        "`shield-pulumi refresh ...` and `shield-pulumi import ...`.",
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def invoke_pulumi_cli(args: list[str]) -> int:
@@ -48,7 +59,10 @@ def invoke_pulumi_cli(args: list[str]) -> int:
         return select_result.returncode
 
     command = ["pulumi", *args, "--cwd", str(project_dir)]
-    return subprocess.run(command, check=False, env=pulumi_env).returncode
+    result = subprocess.run(command, check=False, env=pulumi_env)
+    if result.returncode != 0:
+        _print_manual_recovery_hint()
+    return result.returncode
 
 
 def _invoke_pulumi() -> int:
