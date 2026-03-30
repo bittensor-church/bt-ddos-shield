@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 server-shield-pulumi = "server_shield.pulumi_runner.cli:main"
+server-shield-pulumi-shell = "server_shield.pulumi_runner.shell:main"
 server-shield-chain-reader = "server_shield.chain_reader.cli:main"
 server-shield-chain-writer = "server_shield.chain_writer.cli:main"
 

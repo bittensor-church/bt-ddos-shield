@@ -1,7 +1,13 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from server_shield.pulumi_runner.cli import _build_pulumi_env, _invoke_pulumi, _project_dir, main
+from server_shield.pulumi_runner.cli import (
+    _build_pulumi_env,
+    _invoke_pulumi,
+    _project_dir,
+    invoke_pulumi_cli,
+    main,
+)
 
 
 def _config(backend_url: str = "s3://example-state-bucket/server-shield", stack_name: str = "custom-stack") -> SimpleNamespace:
@@ -114,3 +120,46 @@ def test_pulumi_runner_main_does_not_require_state_dir(monkeypatch) -> None:
     )
 
     assert main() == 0
+
+
+def test_invoke_pulumi_cli_runs_raw_pulumi_args(monkeypatch) -> None:
+    calls: list[tuple[list[str], bool, dict[str, str] | None]] = []
+
+    def fake_run(command: list[str], check: bool, env: dict[str, str] | None = None) -> SimpleNamespace:
+        calls.append((command, check, env))
+        return SimpleNamespace(returncode=0)
+
+    config = _config()
+    monkeypatch.setattr("server_shield.pulumi_runner.cli.get_config", lambda: config)
+    monkeypatch.setattr("server_shield.pulumi_runner.cli.subprocess.run", fake_run)
+
+    exit_code = invoke_pulumi_cli(["refresh", "--clear-pending-creates"])
+
+    assert exit_code == 0
+    assert [call[0] for call in calls] == [
+        ["pulumi", "login", "s3://example-state-bucket/server-shield"],
+        [
+            "pulumi",
+            "stack",
+            "select",
+            "custom-stack",
+            "--create",
+            "--cwd",
+            str(_project_dir()),
+        ],
+        [
+            "pulumi",
+            "refresh",
+            "--clear-pending-creates",
+            "--cwd",
+            str(_project_dir()),
+        ],
+    ]
+
+
+def test_pulumi_shell_main_passes_arguments(monkeypatch) -> None:
+    monkeypatch.setattr("server_shield.pulumi_runner.shell.invoke_pulumi_cli", lambda argv: 17)
+
+    from server_shield.pulumi_runner.shell import main as shell_main
+
+    assert shell_main(["refresh"]) == 17

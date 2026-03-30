@@ -21,7 +21,7 @@ def _project_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "pulumi_project"
 
 
-def _invoke_pulumi() -> int:
+def invoke_pulumi_cli(args: list[str]) -> int:
     config = get_config()
     pulumi_env = _build_pulumi_env(config)
     project_dir = _project_dir()
@@ -47,16 +47,13 @@ def _invoke_pulumi() -> int:
     if select_result.returncode != 0:
         return select_result.returncode
 
-    command = [
-        "pulumi",
-        "up",
-        "--yes",
-        "--stack",
-        config.pulumi.stack_name,
-        "--cwd",
-        str(project_dir),
-    ]
+    command = ["pulumi", *args, "--cwd", str(project_dir)]
     return subprocess.run(command, check=False, env=pulumi_env).returncode
+
+
+def _invoke_pulumi() -> int:
+    config = get_config()
+    return invoke_pulumi_cli(["up", "--yes", "--stack", config.pulumi.stack_name])
 
 
 def main() -> int:
