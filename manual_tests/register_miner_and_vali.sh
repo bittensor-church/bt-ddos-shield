@@ -8,6 +8,6 @@ uv run btcli subnet register --netuid 2 --wallet-name miner --hotkey default --n
 uv run btcli subnet start --netuid 2 --wallet-name alice --hotkey default --network ws://127.0.0.1:9945 -y
 
 for i in {1..11}; do
-  uv run btcli stake add --netuid 2 --wallet-name validator --hotkey default --network ws://127.0.0.1:9945 --amount 5000 --tolerance 1 --partial -y  # keep running until the validator has at least 1k stake, which you can check with the command below:
+  uv run btcli stake add --netuid 2 --wallet-name validator --hotkey default --network ws://127.0.0.1:9945 --amount 5000 --tolerance 1 --partial -y --no-mev-protection
 done
 uv run btcli subnet show --netuid 2 --network ws://127.0.0.1:9945
