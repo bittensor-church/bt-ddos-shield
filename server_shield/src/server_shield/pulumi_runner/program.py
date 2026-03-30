@@ -54,7 +54,10 @@ def build_waf_rule_names(
 ) -> list[str]:
     names: list[str] = []
     if should_create_domain_allow_rule(desired_domains):
-        names.append("allow-predefined-domains")
+        names.extend(
+            f"allow-predefined-domain-{index}"
+            for index, _domain in enumerate(_desired_domain_names(desired_domains))
+        )
     names.append("allow-manifest")
     return names
 
@@ -65,69 +68,40 @@ def build_waf_rules(
 ) -> list[WebAclRuleArgs]:
     waf_rules: list[WebAclRuleArgs] = []
     if should_create_domain_allow_rule(desired_domains):
-        domain_names = [
-            f"{domain}:{miner_port}" for domain in _desired_domain_names(desired_domains)
-        ]
-        if len(domain_names) == 1:
-            domain_statement = WebAclRuleStatementArgs(
-                byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
-                    search_string=domain_names[0],
-                    positional_constraint="EXACTLY",
-                    field_to_match=WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
-                        single_header=WebAclRuleStatementByteMatchStatementFieldToMatchSingleHeaderArgs(
-                            name="host",
-                        ),
+        for index, domain_name in enumerate(_desired_domain_names(desired_domains)):
+            waf_rules.append(
+                WebAclRuleArgs(
+                    name=f"allow-predefined-domain-{index}",
+                    priority=index,
+                    action=WebAclRuleActionArgs(allow=WebAclRuleActionAllowArgs()),
+                    visibility_config=WebAclRuleVisibilityConfigArgs(
+                        sampled_requests_enabled=True,
+                        cloudwatch_metrics_enabled=False,
+                        metric_name=f"allow-predefined-domain-{index}",
                     ),
-                    text_transformations=[
-                        WebAclRuleStatementByteMatchStatementTextTransformationArgs(
-                            priority=0,
-                            type="LOWERCASE",
-                        ),
-                    ],
-                )
-            )
-        else:
-            domain_statement = WebAclRuleStatementArgs(
-                or_statement=WebAclRuleStatementOrStatementArgs(
-                    statements=[
-                        WebAclRuleStatementArgs(
-                            byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
-                                search_string=domain,
-                                positional_constraint="EXACTLY",
-                                field_to_match=WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
-                                    single_header=WebAclRuleStatementByteMatchStatementFieldToMatchSingleHeaderArgs(
-                                        name="host",
-                                    ),
+                    statement=WebAclRuleStatementArgs(
+                        byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
+                            search_string=domain_name.lower(),
+                            positional_constraint="EXACTLY",
+                            field_to_match=WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
+                                single_header=WebAclRuleStatementByteMatchStatementFieldToMatchSingleHeaderArgs(
+                                    name="host",
                                 ),
-                                text_transformations=[
-                                    WebAclRuleStatementByteMatchStatementTextTransformationArgs(
-                                        priority=0,
-                                        type="LOWERCASE",
-                                    ),
-                                ],
-                            )
+                            ),
+                            text_transformations=[
+                                WebAclRuleStatementByteMatchStatementTextTransformationArgs(
+                                    priority=0,
+                                    type="LOWERCASE",
+                                ),
+                            ],
                         )
-                        for domain in domain_names
-                    ],
+                    ),
                 )
             )
-        waf_rules.append(
-            WebAclRuleArgs(
-                name="allow-predefined-domains",
-                priority=0,
-                action=WebAclRuleActionArgs(allow=WebAclRuleActionAllowArgs()),
-                visibility_config=WebAclRuleVisibilityConfigArgs(
-                    sampled_requests_enabled=True,
-                    cloudwatch_metrics_enabled=False,
-                    metric_name="allow-predefined-domains",
-                ),
-                statement=domain_statement,
-            )
-        )
     waf_rules.append(
         WebAclRuleArgs(
             name="allow-manifest",
-            priority=1,
+            priority=len(waf_rules),
             action=WebAclRuleActionArgs(allow=WebAclRuleActionAllowArgs()),
             visibility_config=WebAclRuleVisibilityConfigArgs(
                 sampled_requests_enabled=True,
