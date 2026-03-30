@@ -108,13 +108,23 @@ Current state files:
 - `axon_public_ip.json`: `{ "ip": null }`
 - `desired_domains.json`: `{ "domains": {} }`
 - `blacklist.json`: `[]`
-- `manifest.json`: `{ "manifest_url": null, "encrypted_addresses": [] }`
+- `manifest.json`:
+
+```json
+{
+    "ddos_shield_manifest": {
+        "encrypted_url_mapping": {}
+    }
+}
+```
 
 Behavior notes:
 
 - If `root_domain.json` still contains `null`, the chain reader exits cleanly and leaves `desired_domains.json` unchanged.
-- The chain reader fetches validators from chain, excludes any hotkeys listed in `blacklist.json`, excludes validators with missing or invalid certs, and reconciles `desired_domains.json` to match the eligible validator set.
+- The chain reader fetches validators from chain, excludes any hotkeys listed in `blacklist.json`, excludes validators with missing or invalid certs, reconciles `desired_domains.json`, and writes `manifest.json`.
 - Existing validator domains stay stable across runs unless the validator cert changes or the root domain changes.
+- `manifest.json` contains the final JSON that Pulumi uploads to S3 as `shield_manifest.json`.
+- All state files are written with stable pretty-printed JSON so diffs and Pulumi content hashes do not churn unnecessarily.
 - If `desired_domains.json` contains no domains, the Pulumi runner still applies the base infrastructure and skips the host-based WAF allow rules.
 - If `axon_public_ip.json` still contains `null`, the chain writer exits cleanly and does nothing.
 - All three components run in one Docker image, attempt one run every minute, never overlap with themselves, and each run is capped at 20 minutes.

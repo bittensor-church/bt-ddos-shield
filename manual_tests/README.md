@@ -63,6 +63,14 @@ cat /tmp/server-shield-state/desired_domains.json
 
 The resulting `desired_domains.json` should contain one entry per eligible validator with a domain shaped like `<first8hotkey>-<12 hex chars>.shield.example.com`.
 
+Inspect the generated manifest payload:
+
+```bash
+cat /tmp/server-shield-state/manifest.json
+```
+
+It should contain `ddos_shield_manifest.encrypted_url_mapping` with one base64 ciphertext per eligible validator hotkey.
+
 To exclude a validator manually, edit the blacklist and rerun:
 
 ```bash
@@ -72,3 +80,11 @@ cat /tmp/server-shield-state/desired_domains.json
 ```
 
 That hotkey should be absent from `desired_domains.json` after the rerun.
+
+After `./run_pulumi.sh`, confirm the uploaded object if you have AWS CLI access to the bucket:
+
+```bash
+aws s3 cp "s3://<bucket-name>/shield_manifest.json" -
+```
+
+The downloaded object should match `/tmp/server-shield-state/manifest.json`.
