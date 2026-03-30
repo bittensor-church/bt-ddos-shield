@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec python -m server_shield.shared.supervisor \
+    pulumi-runner \
+    server-shield-pulumi-shell \
+    "$@"

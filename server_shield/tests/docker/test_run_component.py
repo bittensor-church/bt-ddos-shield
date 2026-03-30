@@ -81,3 +81,35 @@ def test_run_component_times_out(tmp_path: Path) -> None:
 
     assert completed.returncode != 0
     assert "timed out after 1s" in (completed.stdout + completed.stderr)
+
+
+def test_shield_pulumi_routes_through_supervisor_with_pulumi_runner_lock(tmp_path: Path) -> None:
+    script = Path("docker/shield-pulumi")
+    bin_dir = tmp_path / "bin"
+    argv_path = tmp_path / "argv.txt"
+    bin_dir.mkdir()
+    fake_python = bin_dir / "python"
+    fake_python.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' \"$@\" > {argv_path}\n",
+    )
+    fake_python.chmod(0o755)
+
+    completed = subprocess.run(
+        ["bash", str(script), "refresh", "--clear-pending-creates"],
+        cwd=Path(__file__).resolve().parents[2],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+    )
+
+    assert completed.returncode == 0
+    assert argv_path.read_text().splitlines() == [
+        "-m",
+        "server_shield.shared.supervisor",
+        "pulumi-runner",
+        "server-shield-pulumi-shell",
+        "refresh",
+        "--clear-pending-creates",
+    ]

@@ -15,6 +15,7 @@ RUN pulumi plugin install resource aws "${PULUMI_AWS_PLUGIN_VERSION}" --exact
 
 COPY server_shield /app
 RUN pip install uv && uv sync --frozen --group dev
-RUN chmod +x /app/docker/run_component.sh /app/docker/entrypoint.sh
+COPY server_shield/docker/shield-pulumi /usr/local/bin/shield-pulumi
+RUN chmod +x /app/docker/run_component.sh /app/docker/entrypoint.sh /usr/local/bin/shield-pulumi
 
 ENTRYPOINT ["/app/docker/entrypoint.sh"]
