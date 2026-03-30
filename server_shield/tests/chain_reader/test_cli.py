@@ -6,7 +6,14 @@ from types import SimpleNamespace
 from server_shield.chain_reader.chain import ValidatorOnChain
 from server_shield.chain_reader.cli import _run_once, main
 from server_shield.shared import state_store
-from server_shield.shared.state_store import read_desired_domains, read_root_domain, write_desired_domains, write_root_domain
+from server_shield.shared.state import ManifestPayloadState, ManifestState
+from server_shield.shared.state_store import (
+    read_desired_domains,
+    read_manifest,
+    read_root_domain,
+    write_desired_domains,
+    write_root_domain,
+)
 
 
 def _write_example_files(example_dir: Path) -> None:
@@ -39,12 +46,14 @@ def test_chain_reader_skips_when_root_domain_missing(tmp_path: Path, capsys, mon
     exit_code = _run_once()
     root_domain = read_root_domain(tmp_path)
     desired_domains = read_desired_domains(tmp_path)
+    manifest = read_manifest(tmp_path)
 
     captured = capsys.readouterr()
     assert exit_code == 0
     assert root_domain.domain is None
     assert "skipping chain_reader because root_domain is null" in captured.out
     assert desired_domains.domains["validator-hotkey-1"].domain == "validator-hotkey-1.example.com"
+    assert manifest.ddos_shield_manifest.encrypted_url_mapping == {}
 
 
 def test_chain_reader_reconciles_domains_from_chain_view(tmp_path: Path, capsys, monkeypatch) -> None:
@@ -78,9 +87,21 @@ def test_chain_reader_reconciles_domains_from_chain_view(tmp_path: Path, capsys,
             ValidatorOnChain("missing-cert-validator", None, "missing certificate"),
         ],
     )
+    monkeypatch.setattr(
+        "server_shield.chain_reader.cli.build_manifest_state",
+        lambda desired_domains: ManifestState(
+            ddos_shield_manifest=ManifestPayloadState(
+                encrypted_url_mapping={
+                    hotkey: f"encrypted-{entry.domain}"
+                    for hotkey, entry in desired_domains.items()
+                }
+            )
+        ),
+    )
 
     exit_code = _run_once()
     desired_domains = read_desired_domains(tmp_path)
+    manifest = read_manifest(tmp_path)
 
     captured = capsys.readouterr()
     assert exit_code == 0
@@ -92,9 +113,14 @@ def test_chain_reader_reconciles_domains_from_chain_view(tmp_path: Path, capsys,
     assert "removed-validator" not in desired_domains.domains
     assert "blacklisted-validator" not in desired_domains.domains
     assert "missing-cert-validator" not in desired_domains.domains
+    assert manifest.ddos_shield_manifest.encrypted_url_mapping == {
+        "existing-validator": "encrypted-existing-validator.shield.example.com",
+        "new-validator": f"encrypted-{desired_domains.domains['new-validator'].domain}",
+    }
     assert "excluding blacklisted validator blacklisted-validator" in captured.out
     assert "excluding validator missing-cert-validator: missing certificate" in captured.out
     assert "chain_reader reconciled observed=4 kept=1 created=1" in captured.out
+    assert "manifest_entries=2" in captured.out
 
 
 def test_chain_reader_module_execution_runs_main(tmp_path: Path) -> None:

@@ -1,4 +1,5 @@
 from server_shield.chain_reader.chain import fetch_validators_with_certs
+from server_shield.chain_reader.manifest import build_manifest_state
 from server_shield.chain_reader.reconciliation import reconcile_desired_domains
 from server_shield.shared.config import get_config
 from server_shield.shared.runtime import run_component
@@ -8,6 +9,7 @@ from server_shield.shared.state_store import (
     read_desired_domains,
     read_root_domain,
     write_desired_domains,
+    write_manifest,
 )
 
 
@@ -44,13 +46,18 @@ def _run_once() -> int:
             for hotkey, entry in result.desired_domains.items()
         }
     )
+    manifest = build_manifest_state(result.desired_domains)
+    write_manifest(
+        encrypted_url_mapping=manifest.ddos_shield_manifest.encrypted_url_mapping,
+    )
     print(
         "chain_reader reconciled "
         f"observed={result.observed} kept={result.kept} created={result.created} "
         f"rotated_for_cert={result.rotated_for_cert} "
         f"rotated_for_root_domain={result.rotated_for_root_domain} "
         f"removed={result.removed} blacklisted={result.blacklisted} "
-        f"invalid_cert={result.invalid_cert}",
+        f"invalid_cert={result.invalid_cert} "
+        f"manifest_entries={len(manifest.ddos_shield_manifest.encrypted_url_mapping)}",
         flush=True,
     )
     return 0
