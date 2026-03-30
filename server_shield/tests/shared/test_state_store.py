@@ -14,7 +14,7 @@ def _write_example_files(example_dir: Path) -> None:
     example_dir.mkdir(parents=True, exist_ok=True)
     (example_dir / "root_domain.example.json").write_text('{"domain": null}\n')
     (example_dir / "axon_public_ip.example.json").write_text('{"ip": null}\n')
-    (example_dir / "desired_domains.example.json").write_text('{"domains": []}\n')
+    (example_dir / "desired_domains.example.json").write_text('{"domains": {}}\n')
     (example_dir / "blacklist.example.json").write_text('{"domains": []}\n')
     (
         example_dir / "manifest.example.json"
@@ -30,7 +30,7 @@ def test_ensure_state_files_creates_null_and_empty_defaults(tmp_path: Path, monk
 
     assert json.loads((runtime_dir / "root_domain.json").read_text()) == {"domain": None}
     assert json.loads((runtime_dir / "axon_public_ip.json").read_text()) == {"ip": None}
-    assert json.loads((runtime_dir / "desired_domains.json").read_text()) == {"domains": []}
+    assert json.loads((runtime_dir / "desired_domains.json").read_text()) == {"domains": {}}
     assert json.loads((runtime_dir / "blacklist.json").read_text()) == {"domains": []}
     assert json.loads((runtime_dir / "manifest.json").read_text()) == {
         "manifest_url": None,
@@ -45,11 +45,26 @@ def test_round_trip_domain_state_uses_typed_models(tmp_path: Path, monkeypatch) 
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", example_dir)
     ensure_state_files(runtime_dir)
 
-    write_desired_domains(runtime_dir, ["alpha.example.com", "beta.example.com"])
+    write_desired_domains(
+        runtime_dir,
+        {
+            "validator-hotkey-1": {
+                "domain": "alpha.example.com",
+                "public_cert": "cert-a",
+            },
+            "validator-hotkey-2": {
+                "domain": "beta.example.com",
+                "public_cert": "cert-b",
+            },
+        },
+    )
     desired_domains = read_desired_domains(runtime_dir)
     axon_public_ip = read_axon_public_ip(runtime_dir)
 
-    assert desired_domains.domains == ["alpha.example.com", "beta.example.com"]
+    assert desired_domains.domains["validator-hotkey-1"].domain == "alpha.example.com"
+    assert desired_domains.domains["validator-hotkey-1"].public_cert == "cert-a"
+    assert desired_domains.domains["validator-hotkey-2"].domain == "beta.example.com"
+    assert desired_domains.domains["validator-hotkey-2"].public_cert == "cert-b"
     assert axon_public_ip.ip is None
 
 
@@ -74,5 +89,5 @@ def test_read_uses_default_state_dir_when_state_dir_not_provided(tmp_path: Path,
 
     desired_domains = read_desired_domains()
 
-    assert desired_domains.domains == []
+    assert desired_domains.domains == {}
     assert (tmp_path / "desired_domains.json").exists()

@@ -100,13 +100,13 @@ The server shield now lives under `server_shield` as one Python project with 3 i
 - `chain_reader`: placeholder job that will eventually read chain state and prepare local desired-domain and manifest data
 - `chain_writer`: placeholder job that will eventually publish miner connection data back to chain
 
-These components communicate through typed JSON state files stored in the server shield state directory. On initial bootstrap the files always exist, but their values may be `null` or empty arrays so downstream components can skip work without treating missing upstream data as an error.
+These components communicate through typed JSON state files stored in the server shield state directory. On initial bootstrap the files always exist, but their values may be `null`, empty arrays, or empty objects so downstream components can skip work without treating missing upstream data as an error.
 
 Current state files:
 
 - `root_domain.json`: `{ "domain": null }`
 - `axon_public_ip.json`: `{ "ip": null }`
-- `desired_domains.json`: `{ "domains": [] }`
+- `desired_domains.json`: `{ "domains": {} }`
 - `blacklist.json`: `{ "domains": [] }`
 - `manifest.json`: `{ "manifest_url": null, "encrypted_addresses": [] }`
 

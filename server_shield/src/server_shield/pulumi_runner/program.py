@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from pathlib import Path
 
 import pulumi
@@ -23,6 +24,7 @@ from pulumi_aws.wafv2._inputs import (
 )
 
 from server_shield.shared.config import get_config
+from server_shield.shared.state import DesiredDomainEntry
 from server_shield.shared.state_store import (
     read_desired_domains,
     write_axon_public_ip,
@@ -30,11 +32,24 @@ from server_shield.shared.state_store import (
 )
 
 
-def should_create_domain_allow_rule(desired_domains: list[str]) -> bool:
+def _desired_domain_names(
+    desired_domains: Mapping[str, DesiredDomainEntry | dict[str, str]],
+) -> list[str]:
+    return [
+        entry.domain if isinstance(entry, DesiredDomainEntry) else entry["domain"]
+        for entry in desired_domains.values()
+    ]
+
+
+def should_create_domain_allow_rule(
+    desired_domains: Mapping[str, DesiredDomainEntry | dict[str, str]],
+) -> bool:
     return bool(desired_domains)
 
 
-def build_waf_rule_names(desired_domains: list[str]) -> list[str]:
+def build_waf_rule_names(
+    desired_domains: Mapping[str, DesiredDomainEntry | dict[str, str]],
+) -> list[str]:
     names: list[str] = []
     if should_create_domain_allow_rule(desired_domains):
         names.append("allow-predefined-domains")
@@ -42,13 +57,16 @@ def build_waf_rule_names(desired_domains: list[str]) -> list[str]:
     return names
 
 
-def build_waf_rules(desired_domains: list[str]) -> list[WebAclRuleArgs]:
+def build_waf_rules(
+    desired_domains: Mapping[str, DesiredDomainEntry | dict[str, str]],
+) -> list[WebAclRuleArgs]:
     waf_rules: list[WebAclRuleArgs] = []
     if should_create_domain_allow_rule(desired_domains):
-        if len(desired_domains) == 1:
+        domain_names = _desired_domain_names(desired_domains)
+        if len(domain_names) == 1:
             domain_statement = WebAclRuleStatementArgs(
                 byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
-                    search_string=desired_domains[0],
+                    search_string=domain_names[0],
                     positional_constraint="EXACTLY",
                     field_to_match=WebAclRuleStatementByteMatchStatementFieldToMatchArgs(
                         single_header=WebAclRuleStatementByteMatchStatementFieldToMatchSingleHeaderArgs(
@@ -84,7 +102,7 @@ def build_waf_rules(desired_domains: list[str]) -> list[WebAclRuleArgs]:
                                 ],
                             )
                         )
-                        for domain in desired_domains
+                        for domain in domain_names
                     ],
                 )
             )

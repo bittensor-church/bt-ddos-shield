@@ -6,27 +6,44 @@ from server_shield.pulumi_runner.program import (
 
 
 def test_empty_desired_domains_skip_host_allow_rule() -> None:
-    assert should_create_domain_allow_rule([]) is False
-    assert build_waf_rule_names([]) == ["allow-manifest"]
+    assert should_create_domain_allow_rule({}) is False
+    assert build_waf_rule_names({}) == ["allow-manifest"]
 
 
 def test_non_empty_desired_domains_include_host_allow_rule() -> None:
-    assert should_create_domain_allow_rule(["miner.example.com"]) is True
-    assert build_waf_rule_names(["miner.example.com"]) == [
+    desired_domains = {
+        "validator-hotkey-1": {
+            "domain": "miner.example.com",
+            "public_cert": "cert-a",
+        }
+    }
+    assert should_create_domain_allow_rule(desired_domains) is True
+    assert build_waf_rule_names(desired_domains) == [
         "allow-predefined-domains",
         "allow-manifest",
     ]
 
 
 def test_build_waf_rules_keeps_manifest_rule_when_domains_empty() -> None:
-    rules = build_waf_rules([])
+    rules = build_waf_rules({})
 
     assert [rule.name for rule in rules] == ["allow-manifest"]
     assert rules[0].statement.byte_match_statement.search_string == "/shield_manifest.json"
 
 
 def test_build_waf_rules_adds_host_rule_for_each_domain() -> None:
-    rules = build_waf_rules(["miner-a.example.com", "miner-b.example.com"])
+    rules = build_waf_rules(
+        {
+            "validator-hotkey-1": {
+                "domain": "miner-a.example.com",
+                "public_cert": "cert-a",
+            },
+            "validator-hotkey-2": {
+                "domain": "miner-b.example.com",
+                "public_cert": "cert-b",
+            },
+        }
+    )
 
     assert [rule.name for rule in rules] == ["allow-predefined-domains", "allow-manifest"]
     statements = rules[0].statement.or_statement.statements
@@ -36,7 +53,14 @@ def test_build_waf_rules_adds_host_rule_for_each_domain() -> None:
 
 
 def test_build_waf_rules_uses_direct_match_for_single_domain() -> None:
-    rules = build_waf_rules(["miner.example.com"])
+    rules = build_waf_rules(
+        {
+            "validator-hotkey-1": {
+                "domain": "miner.example.com",
+                "public_cert": "cert-a",
+            }
+        }
+    )
 
     assert [rule.name for rule in rules] == ["allow-predefined-domains", "allow-manifest"]
     assert rules[0].statement.byte_match_statement.search_string == "miner.example.com"

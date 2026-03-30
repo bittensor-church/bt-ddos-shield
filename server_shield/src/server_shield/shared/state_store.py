@@ -37,12 +37,15 @@ def read_desired_domains(state_dir: Path | None = None) -> DesiredDomainsState:
     return DesiredDomainsState.model_validate_json((resolved_state_dir / "desired_domains.json").read_text())
 
 
-def write_desired_domains(state_dir: Path | None = None, domains: list[str] | None = None) -> None:
+def write_desired_domains(
+    state_dir: Path | None = None,
+    domains: dict[str, dict[str, str]] | None = None,
+) -> None:
     resolved_state_dir = _resolve_state_dir(state_dir)
     ensure_state_files(resolved_state_dir)
     _atomic_write(
         resolved_state_dir / "desired_domains.json",
-        DesiredDomainsState(domains=domains or []).model_dump(),
+        DesiredDomainsState(domains=domains or {}).model_dump(),
     )
 
 

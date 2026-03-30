@@ -9,8 +9,13 @@ class AxonPublicIpState(BaseModel):
     ip: str | None = None
 
 
+class DesiredDomainEntry(BaseModel):
+    domain: str
+    public_cert: str
+
+
 class DesiredDomainsState(BaseModel):
-    domains: list[str] = Field(default_factory=list)
+    domains: dict[str, DesiredDomainEntry] = Field(default_factory=dict)
 
 
 class BlacklistState(BaseModel):

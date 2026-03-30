@@ -12,7 +12,7 @@ def _write_example_files(example_dir: Path) -> None:
     example_dir.mkdir(parents=True, exist_ok=True)
     (example_dir / "root_domain.example.json").write_text('{"domain": null}\n')
     (example_dir / "axon_public_ip.example.json").write_text('{"ip": null}\n')
-    (example_dir / "desired_domains.example.json").write_text('{"domains": []}\n')
+    (example_dir / "desired_domains.example.json").write_text('{"domains": {}}\n')
     (example_dir / "blacklist.example.json").write_text('{"domains": []}\n')
     (example_dir / "manifest.example.json").write_text('{"manifest_url": null, "encrypted_addresses": []}\n')
 
