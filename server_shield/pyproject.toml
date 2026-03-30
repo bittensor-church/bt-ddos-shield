@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Server-side BT DDoS Shield components"
 requires-python = ">=3.14"
 dependencies = [
+    "bittensor>=9.12.2,<10",
     "pulumi>=3.228.0,<4",
     "pulumi-aws>=7.23.0,<8",
     "pydantic>=2.11.0,<3",

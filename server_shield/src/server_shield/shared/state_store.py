@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import shutil
 from tempfile import NamedTemporaryFile
@@ -13,6 +14,7 @@ from server_shield.shared.state import (
 
 
 DEFAULT_STATE_DIR = Path(__file__).resolve().parent / "state_files"
+STATE_DIR_ENV_VAR = "SERVER_SHIELD_STATE_DIR"
 STATE_FILE_NAMES = (
     "root_domain.json",
     "axon_public_ip.json",
@@ -118,6 +120,9 @@ def read_manifest(state_dir: Path | None = None) -> ManifestState:
 
 def _resolve_state_dir(state_dir: Path | None) -> Path:
     if state_dir is None:
+        configured_state_dir = os.environ.get(STATE_DIR_ENV_VAR)
+        if configured_state_dir:
+            return Path(configured_state_dir)
         return DEFAULT_STATE_DIR
     return state_dir
 
