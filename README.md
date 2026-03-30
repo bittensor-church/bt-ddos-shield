@@ -171,6 +171,15 @@ docker run \
   server-shield:local
 ```
 
+If the automated Pulumi runner needs operator intervention, you can run manual Pulumi commands inside the container with:
+
+```bash
+docker exec <container-name> shield-pulumi refresh --clear-pending-creates
+docker exec <container-name> shield-pulumi import ...
+```
+
+`shield-pulumi` runs from the Pulumi project directory with the same Pulumi backend/AWS environment as the scheduled runner and goes through the same supervisor lock. If the automated Pulumi run is active, the manual command will skip rather than overlapping it.
+
 S3 backend example:
 
 ```dotenv

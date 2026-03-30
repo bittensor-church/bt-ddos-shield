@@ -88,3 +88,11 @@ aws s3 cp "s3://<bucket-name>/shield_manifest.json" -
 ```
 
 The downloaded object should match `/tmp/server-shield-state/manifest.json`.
+
+To verify the manual Pulumi helper exists in the built container, run:
+
+```bash
+docker exec <container-name> shield-pulumi stack output
+```
+
+The helper should run Pulumi from the project directory with the same backend/AWS environment as the scheduled runner. It also uses the same supervisor lock, so it will skip if the automated `pulumi-runner` loop is already active.
