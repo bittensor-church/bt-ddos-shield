@@ -5,4 +5,6 @@ description = "Manual tests for bt ddos shield"
 requires-python = ">=3.14"
 dependencies = [
     "bittensor-cli",
+    "bittensor",
+    "dotenv",
 ]
