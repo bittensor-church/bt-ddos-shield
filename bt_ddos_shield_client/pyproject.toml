@@ -1,0 +1,43 @@
+[project]
+name = "bt_ddos_shield_client"
+requires-python = ">=3.11.0"
+dynamic = [
+    "version",
+]
+readme = "README.md"
+dependencies = [
+    "bittensor~=9.0",
+    "bittensor-wallet~=4.0",
+    "cryptography~=43.0",
+    "eciespy~=0.4",
+    "aiohttp>=3.12.13,<4",
+]
+
+[project.optional-dependencies]
+turbobt = [
+    "turbobt~=0.3.1",
+]
+
+[dependency-groups]
+test = [
+    "pytest~=8.3.4",
+    "pytest-asyncio~=1.0.0",
+    "aioresponses~=0.7.8",
+    "bt_ddos_shield_client[turbobt]",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+    "bt_ddos_shield_client",
+    "bt_ddos_shield_client.shielded_turbobt",
+]
+
+[tool.pytest.ini_options]
+addopts = "-s"
+testpaths = [
+    "tests",
+]

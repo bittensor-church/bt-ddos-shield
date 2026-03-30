@@ -7,4 +7,8 @@ dependencies = [
     "bittensor-cli",
     "bittensor",
     "dotenv",
+    "bt_ddos_shield_client[turbobt]",
 ]
+
+[tool.uv.sources]
+bt_ddos_shield_client = { path = "../bt_ddos_shield_client", editable = true }
