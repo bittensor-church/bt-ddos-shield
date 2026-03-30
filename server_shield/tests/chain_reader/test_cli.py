@@ -3,9 +3,10 @@ import os
 import subprocess
 from types import SimpleNamespace
 
+from server_shield.chain_reader.chain import ValidatorOnChain
 from server_shield.chain_reader.cli import _run_once, main
 from server_shield.shared import state_store
-from server_shield.shared.state_store import read_root_domain
+from server_shield.shared.state_store import read_desired_domains, read_root_domain, write_desired_domains, write_root_domain
 
 
 def _write_example_files(example_dir: Path) -> None:
@@ -17,17 +18,77 @@ def _write_example_files(example_dir: Path) -> None:
     (example_dir / "manifest.example.json").write_text('{"manifest_url": null, "encrypted_addresses": []}\n')
 
 
-def test_chain_reader_bootstraps_state_and_exits_zero(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_chain_reader_skips_when_root_domain_missing(tmp_path: Path, capsys, monkeypatch) -> None:
     _write_example_files(tmp_path)
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
+    write_desired_domains(
+        tmp_path,
+        {
+            "validator-hotkey-1": {
+                "domain": "validator-hotkey-1.example.com",
+                "public_cert": "cert-a",
+            }
+        },
+    )
     exit_code = _run_once()
     root_domain = read_root_domain(tmp_path)
+    desired_domains = read_desired_domains(tmp_path)
 
     captured = capsys.readouterr()
     assert exit_code == 0
     assert root_domain.domain is None
-    assert "hello from chain_reader" in captured.out
-    assert (tmp_path / "desired_domains.json").exists()
+    assert "skipping chain_reader because root_domain is null" in captured.out
+    assert desired_domains.domains["validator-hotkey-1"].domain == "validator-hotkey-1.example.com"
+
+
+def test_chain_reader_reconciles_domains_from_chain_view(tmp_path: Path, capsys, monkeypatch) -> None:
+    _write_example_files(tmp_path)
+    monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
+    write_root_domain(tmp_path, "shield.example.com")
+    write_desired_domains(
+        tmp_path,
+        {
+            "existing-validator": {
+                "domain": "existing-validator.shield.example.com",
+                "public_cert": "cert-a",
+            },
+            "removed-validator": {
+                "domain": "removed-validator.shield.example.com",
+                "public_cert": "cert-old",
+            },
+        },
+    )
+    state_store.write_blacklist(tmp_path, ["blacklisted-validator"])
+    monkeypatch.setattr(
+        "server_shield.chain_reader.cli.get_config",
+        lambda: SimpleNamespace(),
+    )
+    monkeypatch.setattr(
+        "server_shield.chain_reader.cli.fetch_validators_with_certs",
+        lambda _config: [
+            ValidatorOnChain("existing-validator", "cert-a"),
+            ValidatorOnChain("new-validator", "cert-b"),
+            ValidatorOnChain("blacklisted-validator", "cert-c"),
+            ValidatorOnChain("missing-cert-validator", None, "missing certificate"),
+        ],
+    )
+
+    exit_code = _run_once()
+    desired_domains = read_desired_domains(tmp_path)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert desired_domains.domains["existing-validator"].domain == "existing-validator.shield.example.com"
+    assert desired_domains.domains["existing-validator"].public_cert == "cert-a"
+    assert desired_domains.domains["new-validator"].public_cert == "cert-b"
+    assert desired_domains.domains["new-validator"].domain.startswith("new-vali-")
+    assert desired_domains.domains["new-validator"].domain.endswith(".shield.example.com")
+    assert "removed-validator" not in desired_domains.domains
+    assert "blacklisted-validator" not in desired_domains.domains
+    assert "missing-cert-validator" not in desired_domains.domains
+    assert "excluding blacklisted validator blacklisted-validator" in captured.out
+    assert "excluding validator missing-cert-validator: missing certificate" in captured.out
+    assert "chain_reader reconciled observed=4 kept=1 created=1" in captured.out
 
 
 def test_chain_reader_module_execution_runs_main(tmp_path: Path) -> None:
@@ -56,7 +117,7 @@ def test_chain_reader_module_execution_runs_main(tmp_path: Path) -> None:
     )
 
     assert completed.returncode == 0
-    assert "hello from chain_reader" in completed.stdout
+    assert "skipping chain_reader because root_domain is null" in completed.stdout
 
 
 def test_chain_reader_main_does_not_require_state_dir(monkeypatch) -> None:
