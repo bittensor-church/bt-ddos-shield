@@ -61,10 +61,13 @@ def build_waf_rule_names(
 
 def build_waf_rules(
     desired_domains: Mapping[str, DesiredDomainEntry | dict[str, str]],
+    miner_port: int,
 ) -> list[WebAclRuleArgs]:
     waf_rules: list[WebAclRuleArgs] = []
     if should_create_domain_allow_rule(desired_domains):
-        domain_names = _desired_domain_names(desired_domains)
+        domain_names = [
+            f"{domain}:{miner_port}" for domain in _desired_domain_names(desired_domains)
+        ]
         if len(domain_names) == 1:
             domain_statement = WebAclRuleStatementArgs(
                 byte_match_statement=WebAclRuleStatementByteMatchStatementArgs(
@@ -361,7 +364,7 @@ def run_program() -> None:
         ],
     )
 
-    waf_rules = build_waf_rules(desired_domains)
+    waf_rules = build_waf_rules(desired_domains, miner_port=miner_port)
     waf_acl = WebAcl(
         "shield-waf-acl",
         scope="REGIONAL",
