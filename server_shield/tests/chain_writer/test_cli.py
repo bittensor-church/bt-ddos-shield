@@ -29,17 +29,34 @@ def test_chain_writer_skips_when_axon_public_ip_missing(tmp_path: Path, capsys, 
     assert "skipping chain_writer because axon_public_ip is null" in captured.out
 
 
-def test_chain_writer_logs_placeholder_when_axon_public_ip_present(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_chain_writer_delegates_to_publish_when_axon_public_ip_present(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
     _write_example_files(tmp_path)
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
     ensure_state_files(tmp_path)
     write_axon_public_ip(tmp_path, "1.2.3.4")
+    fake_config = SimpleNamespace(name="config")
+    monkeypatch.setattr("server_shield.chain_writer.cli.get_config", lambda: fake_config)
+
+    def fake_publish(config, axon_public_ip: str) -> int:
+        assert config is fake_config
+        assert axon_public_ip == "1.2.3.4"
+        print(f"delegated chain_writer publish for {axon_public_ip}")
+        return 0
+
+    monkeypatch.setattr(
+        "server_shield.chain_writer.cli._publish_axon_if_needed",
+        fake_publish,
+    )
 
     exit_code = _run_once()
 
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert "hello from chain_writer for 1.2.3.4" in captured.out
+    assert "delegated chain_writer publish for 1.2.3.4" in captured.out
 
 
 def test_chain_writer_module_execution_runs_main(tmp_path: Path) -> None:
