@@ -85,12 +85,12 @@ def read_blacklist(state_dir: Path | None = None) -> BlacklistState:
     return BlacklistState.model_validate_json((resolved_state_dir / "blacklist.json").read_text())
 
 
-def write_blacklist(state_dir: Path | None = None, domains: list[str] | None = None) -> None:
+def write_blacklist(state_dir: Path | None = None, hotkeys: list[str] | None = None) -> None:
     resolved_state_dir = _resolve_state_dir(state_dir)
     ensure_state_files(resolved_state_dir)
     _atomic_write(
         resolved_state_dir / "blacklist.json",
-        BlacklistState(domains=domains or []).model_dump(),
+        BlacklistState(hotkeys or []).model_dump(),
     )
 
 
@@ -129,7 +129,7 @@ def _copy_example_state_file(file_name: str, state_dir: Path) -> None:
     shutil.copyfile(example_path, state_dir / file_name)
 
 
-def _atomic_write(path: Path, payload: dict[str, object]) -> None:
+def _atomic_write(path: Path, payload: object) -> None:
     with NamedTemporaryFile("w", dir=path.parent, delete=False) as handle:
         json.dump(payload, handle)
         handle.write("\n")

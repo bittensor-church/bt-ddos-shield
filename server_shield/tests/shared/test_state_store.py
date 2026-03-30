@@ -15,7 +15,7 @@ def _write_example_files(example_dir: Path) -> None:
     (example_dir / "root_domain.example.json").write_text('{"domain": null}\n')
     (example_dir / "axon_public_ip.example.json").write_text('{"ip": null}\n')
     (example_dir / "desired_domains.example.json").write_text('{"domains": {}}\n')
-    (example_dir / "blacklist.example.json").write_text('{"domains": []}\n')
+    (example_dir / "blacklist.example.json").write_text('[]\n')
     (
         example_dir / "manifest.example.json"
     ).write_text('{"manifest_url": null, "encrypted_addresses": []}\n')
@@ -31,7 +31,7 @@ def test_ensure_state_files_creates_null_and_empty_defaults(tmp_path: Path, monk
     assert json.loads((runtime_dir / "root_domain.json").read_text()) == {"domain": None}
     assert json.loads((runtime_dir / "axon_public_ip.json").read_text()) == {"ip": None}
     assert json.loads((runtime_dir / "desired_domains.json").read_text()) == {"domains": {}}
-    assert json.loads((runtime_dir / "blacklist.json").read_text()) == {"domains": []}
+    assert json.loads((runtime_dir / "blacklist.json").read_text()) == []
     assert json.loads((runtime_dir / "manifest.json").read_text()) == {
         "manifest_url": None,
         "encrypted_addresses": [],
@@ -91,3 +91,20 @@ def test_read_uses_default_state_dir_when_state_dir_not_provided(tmp_path: Path,
 
     assert desired_domains.domains == {}
     assert (tmp_path / "desired_domains.json").exists()
+
+
+def test_blacklist_round_trip_uses_validator_hotkey_list(tmp_path: Path, monkeypatch) -> None:
+    example_dir = tmp_path / "examples"
+    runtime_dir = tmp_path / "runtime"
+    _write_example_files(example_dir)
+    monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", example_dir)
+    ensure_state_files(runtime_dir)
+
+    state_store.write_blacklist(runtime_dir, ["validator-hotkey-1", "validator-hotkey-2"])
+    blacklist = state_store.read_blacklist(runtime_dir)
+
+    assert json.loads((runtime_dir / "blacklist.json").read_text()) == [
+        "validator-hotkey-1",
+        "validator-hotkey-2",
+    ]
+    assert blacklist.root == ["validator-hotkey-1", "validator-hotkey-2"]

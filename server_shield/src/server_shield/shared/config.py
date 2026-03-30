@@ -20,15 +20,9 @@ class PulumiSettings(BaseModel):
     aws: AwsShieldSettings
 
 
-class ChainReaderSettings(BaseModel):
-    subtensor_address: str = ""
-    netuid: int = 0
-
-
 class ChainWriterSettings(BaseModel):
-    wallet_name: str = ""
-    subtensor_address: str = ""
-    netuid: int = 0
+    wallet_name: str
+    wallet_hotkey: str
 
 
 class AppConfig(BaseSettings):
@@ -42,9 +36,10 @@ class AppConfig(BaseSettings):
     log_level: str = "INFO"
     sentry_dsn: str | None = None
     miner_port: int
+    subtensor_address: str
+    netuid: int
     pulumi: PulumiSettings
-    chain_reader: ChainReaderSettings = ChainReaderSettings()
-    chain_writer: ChainWriterSettings = ChainWriterSettings()
+    chain_writer: ChainWriterSettings
 
 
 @lru_cache(maxsize=1)

@@ -16,7 +16,7 @@ def _run_once() -> int:
     write_desired_domains(domains={})
     write_manifest(manifest_url=None, encrypted_addresses=[])
     print(
-        f"hello from chain_reader hosted_zone={root_domain.domain!r} blacklist_size={len(blacklist.domains)}",
+        f"hello from chain_reader hosted_zone={root_domain.domain!r} blacklist_size={len(blacklist.root)}",
         flush=True,
     )
     return 0

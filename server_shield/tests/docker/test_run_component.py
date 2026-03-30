@@ -1,12 +1,13 @@
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 
 def test_run_component_prefixes_logs_and_returns_zero(tmp_path: Path) -> None:
     script = Path("docker/run_component.sh")
     component = "chain-reader"
-    command = ["bash", str(script), component, "python", "-c", "print('hello')"]
+    command = ["bash", str(script), component, sys.executable, "-c", "print('hello')"]
 
     completed = subprocess.run(
         command,
@@ -26,7 +27,7 @@ def test_run_component_skips_when_lock_exists(tmp_path: Path) -> None:
     lock_path = tmp_path / "chain-writer.lock"
     holder = subprocess.Popen(
         [
-            "python",
+            sys.executable,
             "-c",
             (
                 "import fcntl, pathlib, time; "
@@ -39,7 +40,7 @@ def test_run_component_skips_when_lock_exists(tmp_path: Path) -> None:
         ],
         cwd=Path(__file__).resolve().parents[2],
     )
-    command = ["bash", str(script), "chain-writer", "python", "-c", "print('ignored')"]
+    command = ["bash", str(script), "chain-writer", sys.executable, "-c", "print('ignored')"]
 
     try:
         completed = subprocess.run(
@@ -64,7 +65,7 @@ def test_run_component_times_out(tmp_path: Path) -> None:
         "bash",
         str(script),
         "pulumi-runner",
-        "python",
+        sys.executable,
         "-c",
         "import time; time.sleep(2)",
     ]

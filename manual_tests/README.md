@@ -19,7 +19,12 @@ uv run btcli wallet create --wallet.name validator --hotkey default --no-use-pas
 
 ### pulumi:
 
-fill in .env values and run
+fill in `.env` values and run. the current config also requires:
+
+- `SERVER_SHIELD_SUBTENSOR_ADDRESS`
+- `SERVER_SHIELD_NETUID`
+- `SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME`
+- `SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY`
 
 ```bash
 ./run_pulumu.sh
@@ -32,4 +37,3 @@ if you want to destroy the infra to save costs:
 ```
 
 ### chain_reader
-

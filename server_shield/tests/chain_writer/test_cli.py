@@ -13,7 +13,7 @@ def _write_example_files(example_dir: Path) -> None:
     (example_dir / "root_domain.example.json").write_text('{"domain": null}\n')
     (example_dir / "axon_public_ip.example.json").write_text('{"ip": null}\n')
     (example_dir / "desired_domains.example.json").write_text('{"domains": {}}\n')
-    (example_dir / "blacklist.example.json").write_text('{"domains": []}\n')
+    (example_dir / "blacklist.example.json").write_text('[]\n')
     (example_dir / "manifest.example.json").write_text('{"manifest_url": null, "encrypted_addresses": []}\n')
 
 
@@ -52,6 +52,8 @@ def test_chain_writer_module_execution_runs_main(tmp_path: Path) -> None:
         env={
             **os.environ,
             "SERVER_SHIELD_STATE_DIR": str(tmp_path),
+            "SERVER_SHIELD_SUBTENSOR_ADDRESS": "ws://subtensor",
+            "SERVER_SHIELD_NETUID": "12",
             "SERVER_SHIELD_PULUMI__BACKEND_URL": "file:///tmp/server-shield-test-state",
             "SERVER_SHIELD_PULUMI__SHIELD_BACKEND": "AWS",
             "SERVER_SHIELD_MINER_PORT": "9001",
@@ -60,6 +62,8 @@ def test_chain_writer_module_execution_runs_main(tmp_path: Path) -> None:
             "SERVER_SHIELD_PULUMI__AWS__AWS_REGION": "eu-north-1",
             "SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID": "Z123",
             "SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID": "i-123",
+            "SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME": "miner",
+            "SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY": "miner-hotkey",
         },
     )
 

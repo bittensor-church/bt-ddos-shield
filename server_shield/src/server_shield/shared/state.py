@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 
 class RootDomainState(BaseModel):
@@ -18,8 +18,8 @@ class DesiredDomainsState(BaseModel):
     domains: dict[str, DesiredDomainEntry] = Field(default_factory=dict)
 
 
-class BlacklistState(BaseModel):
-    domains: list[str] = Field(default_factory=list)
+class BlacklistState(RootModel[list[str]]):
+    root: list[str] = Field(default_factory=list)
 
 
 class ManifestState(BaseModel):
