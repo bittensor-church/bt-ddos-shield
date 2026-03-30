@@ -37,3 +37,38 @@ if you want to destroy the infra to save costs:
 ```
 
 ### chain_reader
+
+For live chain-reader verification against Finney subnet 12, add these values to `manual_tests/.env`:
+
+- `SERVER_SHIELD_SUBTENSOR_ADDRESS=finney`
+- `SERVER_SHIELD_NETUID=12`
+- `SERVER_SHIELD_STATE_DIR=/tmp/server-shield-state`
+
+Prepare the shared state directory:
+
+```bash
+mkdir -p /tmp/server-shield-state
+cp ../server_shield/src/server_shield/shared/state_files/*.example.json /tmp/server-shield-state/
+for file in /tmp/server-shield-state/*.example.json; do mv "$file" "${file%.example.json}.json"; done
+printf '{"domain": "shield.example.com"}\n' > /tmp/server-shield-state/root_domain.json
+printf '[]\n' > /tmp/server-shield-state/blacklist.json
+```
+
+Run the reader:
+
+```bash
+./run_chain_reader.sh
+cat /tmp/server-shield-state/desired_domains.json
+```
+
+The resulting `desired_domains.json` should contain one entry per eligible validator with a domain shaped like `<first8hotkey>-<12 hex chars>.shield.example.com`.
+
+To exclude a validator manually, edit the blacklist and rerun:
+
+```bash
+printf '["<validator-hotkey>"]\n' > /tmp/server-shield-state/blacklist.json
+./run_chain_reader.sh
+cat /tmp/server-shield-state/desired_domains.json
+```
+
+That hotkey should be absent from `desired_domains.json` after the rerun.

@@ -97,8 +97,8 @@ to `GET /` request on server's traffic port. Also, server security group should 
 The server shield now lives under `server_shield` as one Python project with 3 internal components:
 
 - `pulumi_runner`: provisions and updates the AWS infrastructure
-- `chain_reader`: placeholder job that will eventually read chain state and prepare local desired-domain and manifest data
-- `chain_writer`: placeholder job that will eventually publish miner connection data back to chain
+- `chain_reader`: reads the validator set and validator certs from chain, then reconciles `desired_domains.json`
+- `chain_writer`: publishes the miner axon info back to chain when `axon_public_ip.json` is available
 
 These components communicate through typed JSON state files stored in the server shield state directory. On initial bootstrap the files always exist, but their values may be `null`, empty arrays, or empty objects so downstream components can skip work without treating missing upstream data as an error.
 
@@ -112,6 +112,9 @@ Current state files:
 
 Behavior notes:
 
+- If `root_domain.json` still contains `null`, the chain reader exits cleanly and leaves `desired_domains.json` unchanged.
+- The chain reader fetches validators from chain, excludes any hotkeys listed in `blacklist.json`, excludes validators with missing or invalid certs, and reconciles `desired_domains.json` to match the eligible validator set.
+- Existing validator domains stay stable across runs unless the validator cert changes or the root domain changes.
 - If `desired_domains.json` contains no domains, the Pulumi runner still applies the base infrastructure and skips the host-based WAF allow rules.
 - If `axon_public_ip.json` still contains `null`, the chain writer exits cleanly and does nothing.
 - All three components run in one Docker image, attempt one run every minute, never overlap with themselves, and each run is capped at 20 minutes.
@@ -127,6 +130,8 @@ docker build -f server_shield/Dockerfile -t server-shield:local .
 
 Pulumi backend configuration is mandatory. Set `SERVER_SHIELD_PULUMI__BACKEND_URL` in your environment.
 
+If you want `blacklist.json` and the other shared state files to persist across container restarts, set `SERVER_SHIELD_STATE_DIR` to a mounted directory. This is recommended in production. Mount the whole state directory, not just `blacklist.json`, so the operator-managed blacklist and the generated JSON state stay together.
+
 Local file backend example:
 
 ```dotenv
@@ -138,6 +143,7 @@ SERVER_SHIELD_SUBTENSOR_ADDRESS=ws://...
 SERVER_SHIELD_NETUID=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY=...
+SERVER_SHIELD_STATE_DIR=/var/lib/server-shield/state
 SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID=...
 SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY=...
 SERVER_SHIELD_PULUMI__AWS__AWS_REGION=eu-north-1
@@ -151,6 +157,7 @@ Run the container with a persistent Pulumi state volume:
 docker run \
   --env-file .env \
   --volume server-shield-pulumi-state:/var/lib/server-shield/pulumi-state \
+  --volume server-shield-state:/var/lib/server-shield/state \
   server-shield:local
 ```
 
@@ -165,6 +172,7 @@ SERVER_SHIELD_SUBTENSOR_ADDRESS=ws://...
 SERVER_SHIELD_NETUID=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY=...
+SERVER_SHIELD_STATE_DIR=/var/lib/server-shield/state
 SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID=...
 SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY=...
 SERVER_SHIELD_PULUMI__AWS__AWS_REGION=eu-north-1
@@ -175,7 +183,12 @@ SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID=...
 Run the container against the S3 backend:
 
 ```bash
-docker run --env-file .env server-shield:local
+docker run \
+  --env-file .env \
+  --volume server-shield-state:/var/lib/server-shield/state \
+  server-shield:local
 ```
 
-The build command must be run from the repository root so `COPY server_shield ...` in the Dockerfile can see the project files. For the local file backend, `/var/lib/server-shield/pulumi-state` must be persisted with a Docker volume. For the S3 backend, the bucket must already exist. `SERVER_SHIELD_PULUMI__STACK_NAME` is optional and defaults to `server-shield`. `SERVER_SHIELD_PULUMI__SHIELD_BACKEND` is currently required and must be `AWS`. `SERVER_SHIELD_SUBTENSOR_ADDRESS`, `SERVER_SHIELD_NETUID`, `SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME`, and `SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY` are also required.
+The build command must be run from the repository root so `COPY server_shield ...` in the Dockerfile can see the project files. For the local file backend, `/var/lib/server-shield/pulumi-state` must be persisted with a Docker volume. For the S3 backend, the bucket must already exist. In both cases, `/var/lib/server-shield/state` should be persisted if you want the shared JSON state and `blacklist.json` edits to survive restarts. `SERVER_SHIELD_PULUMI__STACK_NAME` is optional and defaults to `server-shield`. `SERVER_SHIELD_PULUMI__SHIELD_BACKEND` is currently required and must be `AWS`. `SERVER_SHIELD_SUBTENSOR_ADDRESS`, `SERVER_SHIELD_NETUID`, `SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME`, and `SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY` are also required.
+
+Operators control validator exclusions through `blacklist.json`, which is a JSON array of validator hotkeys in the shared state directory. Add a hotkey to remove that validator from `desired_domains.json` on the next `chain_reader` run. Remove a hotkey to let the chain reader add it back if it is still a validator with a valid cert.
