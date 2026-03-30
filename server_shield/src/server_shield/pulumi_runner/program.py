@@ -1,3 +1,4 @@
+import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -27,6 +28,7 @@ from server_shield.shared.config import get_config
 from server_shield.shared.state import DesiredDomainEntry
 from server_shield.shared.state_store import (
     read_desired_domains,
+    read_manifest,
     write_axon_public_ip,
     write_root_domain,
 )
@@ -149,9 +151,19 @@ def build_waf_rules(
     return waf_rules
 
 
+def serialize_manifest_content(manifest: Mapping[str, object]) -> str:
+    return json.dumps(manifest, indent=4, sort_keys=True) + "\n"
+
+
+def manifest_source_hash(serialized_manifest: str) -> str:
+    return hashlib.sha256(serialized_manifest.encode("utf-8")).hexdigest()
+
+
 def run_program() -> None:
     config = get_config()
     desired_domains = read_desired_domains().domains
+    manifest = read_manifest().model_dump()
+    serialized_manifest = serialize_manifest_content(manifest)
     miner_instance_id = config.pulumi.aws.miner_instance_id
     miner_port = config.miner_port
     hosted_zone_id = config.pulumi.aws.hosted_zone_id
@@ -210,6 +222,15 @@ def run_program() -> None:
                 }
             )
         ),
+        opts=pulumi.ResourceOptions(depends_on=[bucket_public_access, bucket_ownership]),
+    )
+    aws.s3.BucketObject(
+        "shield-manifest-object",
+        bucket=bucket.id,
+        key="shield_manifest.json",
+        content=serialized_manifest,
+        content_type="application/json",
+        source_hash=manifest_source_hash(serialized_manifest),
         opts=pulumi.ResourceOptions(depends_on=[bucket_public_access, bucket_ownership]),
     )
 
