@@ -12,13 +12,17 @@ from server_shield.shared.state_store import (
 
 def _write_example_files(example_dir: Path) -> None:
     example_dir.mkdir(parents=True, exist_ok=True)
-    (example_dir / "root_domain.example.json").write_text('{"domain": null}\n')
-    (example_dir / "axon_public_ip.example.json").write_text('{"ip": null}\n')
-    (example_dir / "desired_domains.example.json").write_text('{"domains": {}}\n')
+    (example_dir / "root_domain.example.json").write_text('{\n    "domain": null\n}\n')
+    (example_dir / "axon_public_ip.example.json").write_text('{\n    "ip": null\n}\n')
+    (example_dir / "desired_domains.example.json").write_text('{\n    "domains": {}\n}\n')
     (example_dir / "blacklist.example.json").write_text('[]\n')
-    (
-        example_dir / "manifest.example.json"
-    ).write_text('{"manifest_url": null, "encrypted_addresses": []}\n')
+    (example_dir / "manifest.example.json").write_text(
+        '{\n'
+        '    "ddos_shield_manifest": {\n'
+        '        "encrypted_url_mapping": {}\n'
+        '    }\n'
+        '}\n'
+    )
 
 
 def test_ensure_state_files_creates_null_and_empty_defaults(tmp_path: Path, monkeypatch) -> None:
@@ -33,9 +37,11 @@ def test_ensure_state_files_creates_null_and_empty_defaults(tmp_path: Path, monk
     assert json.loads((runtime_dir / "desired_domains.json").read_text()) == {"domains": {}}
     assert json.loads((runtime_dir / "blacklist.json").read_text()) == []
     assert json.loads((runtime_dir / "manifest.json").read_text()) == {
-        "manifest_url": None,
-        "encrypted_addresses": [],
+        "ddos_shield_manifest": {
+            "encrypted_url_mapping": {},
+        },
     }
+    assert (runtime_dir / "root_domain.json").read_text() == '{\n    "domain": null\n}\n'
 
 
 def test_round_trip_domain_state_uses_typed_models(tmp_path: Path, monkeypatch) -> None:
@@ -66,6 +72,7 @@ def test_round_trip_domain_state_uses_typed_models(tmp_path: Path, monkeypatch) 
     assert desired_domains.domains["validator-hotkey-2"].domain == "beta.example.com"
     assert desired_domains.domains["validator-hotkey-2"].public_cert == "cert-b"
     assert axon_public_ip.ip is None
+    assert (runtime_dir / "desired_domains.json").read_text().startswith('{\n    "domains": {')
 
 
 def test_read_copies_example_file_when_runtime_state_missing(tmp_path: Path, monkeypatch) -> None:

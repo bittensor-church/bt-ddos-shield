@@ -22,6 +22,9 @@ class BlacklistState(RootModel[list[str]]):
     root: list[str] = Field(default_factory=list)
 
 
+class ManifestPayloadState(BaseModel):
+    encrypted_url_mapping: dict[str, str] = Field(default_factory=dict)
+
+
 class ManifestState(BaseModel):
-    manifest_url: str | None = None
-    encrypted_addresses: list[str] = Field(default_factory=list)
+    ddos_shield_manifest: ManifestPayloadState = Field(default_factory=ManifestPayloadState)

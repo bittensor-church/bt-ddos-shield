@@ -1,1 +1,5 @@
-{"manifest_url": null, "encrypted_addresses": []}
+{
+    "ddos_shield_manifest": {
+        "encrypted_url_mapping": {}
+    }
+}

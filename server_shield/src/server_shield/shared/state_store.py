@@ -9,6 +9,7 @@ from server_shield.shared.state import (
     BlacklistState,
     DesiredDomainsState,
     ManifestState,
+    ManifestPayloadState,
     RootDomainState,
 )
 
@@ -98,16 +99,16 @@ def write_blacklist(state_dir: Path | None = None, hotkeys: list[str] | None = N
 
 def write_manifest(
     state_dir: Path | None = None,
-    manifest_url: str | None = None,
-    encrypted_addresses: list[str] | None = None,
+    encrypted_url_mapping: dict[str, str] | None = None,
 ) -> None:
     resolved_state_dir = _resolve_state_dir(state_dir)
     ensure_state_files(resolved_state_dir)
     _atomic_write(
         resolved_state_dir / "manifest.json",
         ManifestState(
-            manifest_url=manifest_url,
-            encrypted_addresses=encrypted_addresses or [],
+            ddos_shield_manifest=ManifestPayloadState(
+                encrypted_url_mapping=encrypted_url_mapping or {},
+            ),
         ).model_dump(),
     )
 
@@ -136,7 +137,7 @@ def _copy_example_state_file(file_name: str, state_dir: Path) -> None:
 
 def _atomic_write(path: Path, payload: object) -> None:
     with NamedTemporaryFile("w", dir=path.parent, delete=False) as handle:
-        json.dump(payload, handle)
+        json.dump(payload, handle, indent=4, sort_keys=True)
         handle.write("\n")
         temp_path = Path(handle.name)
     temp_path.replace(path)
