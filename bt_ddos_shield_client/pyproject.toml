@@ -1,6 +1,6 @@
 [project]
 name = "bt_ddos_shield_client"
-requires-python = ">=3.11.0"
+requires-python = ">=3.11,<3.14"
 dynamic = [
     "version",
 ]
