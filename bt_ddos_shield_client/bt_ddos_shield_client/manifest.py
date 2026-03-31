@@ -90,11 +90,10 @@ logger = logging.getLogger(__name__)
 def get_address_for_validator(
     manifest: Manifest,
     validator_hotkey: Hotkey,
+    miner_hotkey: Hotkey,
     validator_private_key: PrivateKey,
     encryption: ECIESEncryptionManager | None = None,
 ) -> ShieldAddress | None:
-    print(manifest)
-    print(validator_hotkey)
     encrypted_url = manifest.encrypted_url_mapping.get(validator_hotkey)
     if encrypted_url is None:
         return None
@@ -102,5 +101,5 @@ def get_address_for_validator(
     try:
         return (encryption or ECIESEncryptionManager()).decrypt(validator_private_key, encrypted_url).decode()
     except Exception as ex:
-        logger.debug(f"failed to decrypt address for validator {validator_hotkey}: {ex}")
+        logger.debug(f"failed to decrypt address of {miner_hotkey} for validator {validator_hotkey}: {ex}")
         return None

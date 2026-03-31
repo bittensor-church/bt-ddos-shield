@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import Executor
 import threading
 from dataclasses import dataclass
 from typing import Any
@@ -25,11 +26,30 @@ def decode_subtensor_certificate_info(subtensor_certificate_info: dict[str, Any]
     return SubtensorCertificate(algorithm, bytes(data).hex())
 
 
-def run_async_in_thread(async_fn) -> Any:
+def parse_shield_address(shield_address: str) -> tuple[str, int] | None:
+    host, separator, port_text = shield_address.rpartition(':')
+    if not host or not separator or not port_text:
+        return None
+
+    try:
+        return host, int(port_text)
+    except ValueError:
+        return None
+
+
+def _run_coroutine(async_fn) -> Any:
+    return asyncio.run(async_fn)
+
+
+def run_async_in_thread(async_fn, *, executor: Executor | None = None) -> Any:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(async_fn)
+
+    if executor is not None:
+        future = executor.submit(_run_coroutine, async_fn)
+        return future.result()
 
     result = None
     exception = None
