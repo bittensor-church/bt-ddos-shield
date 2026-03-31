@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+from functools import partial
 
 import turbobt
 import turbobt.neuron
@@ -9,7 +10,7 @@ from bt_ddos_shield_client.certificate_reconciliation import CertificateReconcil
 from bt_ddos_shield_client.client import ShieldClient
 from bt_ddos_shield_client.internal import parse_shield_address
 from bt_ddos_shield_client.shield_metagraph import ShieldMetagraphOptions, resolve_certificate_path
-from bt_ddos_shield_client.shielded_turbobt.contacts import TurboBittensorSubtensorContact
+from bt_ddos_shield_client.shielded_turbobt.contacts import turbo_bittensor_subtensor_contact
 
 
 class ShieldedBittensor(turbobt.Bittensor):
@@ -24,16 +25,23 @@ class ShieldedBittensor(turbobt.Bittensor):
         super().__init__(*args, wallet=wallet, **kwargs)
         self.ddos_shield_options = ddos_shield_options or ShieldMetagraphOptions()
         self.ddos_shield_netuid = ddos_shield_netuid
-        self._contact = TurboBittensorSubtensorContact(
-            bittensor=self,
-            netuid=ddos_shield_netuid,
-            wallet=wallet,
-        )
+        self._contact = turbo_bittensor_subtensor_contact()
         self._shield_client = ShieldClient(
             certificate_path=resolve_certificate_path(self.ddos_shield_options.certificate_path),
         )
         self._certificate_reconciler = CertificateReconciler(
-            contact=self._contact,
+            get_own_public_key=partial(
+                self._contact.get_own_public_key,
+                bittensor=self,
+                netuid=ddos_shield_netuid,
+                hotkey=wallet.hotkey.ss58_address,
+            ),
+            upload_public_key=partial(
+                self._contact.upload_public_key,
+                bittensor=self,
+                netuid=ddos_shield_netuid,
+                wallet=wallet,
+            ),
             certificate=self._shield_client.certificate,
             disabled=self.ddos_shield_options.disable_uploading_certificate,
         )
@@ -64,7 +72,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
     client: dataclasses.InitVar[turbobt.Bittensor]
     wallet: dataclasses.InitVar[object | None] = None
     ddos_shield_options: dataclasses.InitVar[ShieldMetagraphOptions | None] = None
-    contact: dataclasses.InitVar[TurboBittensorSubtensorContact | None] = None
+    contact: dataclasses.InitVar[object | None] = None
     shield_client: dataclasses.InitVar[ShieldClient | None] = None
     certificate_reconciler: dataclasses.InitVar[CertificateReconciler | None] = None
 
@@ -78,18 +86,26 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
         certificate_reconciler=None,
     ):
         super().__post_init__(client)
+        self.client = client
         self.wallet = wallet or client.wallet
         self.ddos_shield_options = ddos_shield_options or ShieldMetagraphOptions()
-        self._contact = contact or TurboBittensorSubtensorContact(
-            bittensor=client,
-            netuid=self.netuid,
-            wallet=self.wallet,
-        )
+        self._contact = contact or turbo_bittensor_subtensor_contact()
         self._shield_client = shield_client or ShieldClient(
             certificate_path=resolve_certificate_path(self.ddos_shield_options.certificate_path),
         )
         self._certificate_reconciler = certificate_reconciler or CertificateReconciler(
-            contact=self._contact,
+            get_own_public_key=partial(
+                self._contact.get_own_public_key,
+                bittensor=client,
+                netuid=self.netuid,
+                hotkey=self.wallet.hotkey.ss58_address,
+            ),
+            upload_public_key=partial(
+                self._contact.upload_public_key,
+                bittensor=client,
+                netuid=self.netuid,
+                wallet=self.wallet,
+            ),
             certificate=self._shield_client.certificate,
             disabled=self.ddos_shield_options.disable_uploading_certificate,
         )
@@ -102,7 +118,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
         *,
         wallet=None,
         ddos_shield_options: ShieldMetagraphOptions | None = None,
-        contact: TurboBittensorSubtensorContact | None = None,
+        contact=None,
         shield_client: ShieldClient | None = None,
         certificate_reconciler: CertificateReconciler | None = None,
     ) -> 'ShieldedSubnetReference':
@@ -118,15 +134,21 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
 
     async def list_neurons(self, *args, **kwargs) -> list[turbobt.neuron.Neuron]:
         await self._certificate_reconciler.ensure_own_certificate_matches()
-        neurons = await self._contact.list_neurons(*args, **kwargs)
+        neurons = await self._contact.list_neurons(
+            bittensor=self.client,
+            netuid=self.netuid,
+            *args,
+            **kwargs,
+        )
         validator_hotkey = self.wallet.hotkey.ss58_address
-        for neuron in neurons:
-            shield_address = await self._shield_client.resolve_shield_address(
-                validator_hotkey,
-                neuron.hotkey,
-                str(neuron.axon_info.ip),
-                neuron.axon_info.port,
-            )
+        shield_addresses = await self._shield_client.resolve_shield_addresses(
+            validator_hotkey,
+            [
+                (neuron.hotkey, str(neuron.axon_info.ip), neuron.axon_info.port)
+                for neuron in neurons
+            ],
+        )
+        for neuron, shield_address in zip(neurons, shield_addresses, strict=False):
             if shield_address is None:
                 continue
             parsed_address = parse_shield_address(shield_address)

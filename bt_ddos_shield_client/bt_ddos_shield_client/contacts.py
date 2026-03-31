@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 import asyncio
 from typing import Protocol
 
@@ -32,16 +33,48 @@ class MetagraphContact(CertificateContact, Protocol):
     ) -> None: ...
 
 
-class BittensorSubtensorContact:
-    def __init__(self, subtensor: Subtensor, netuid: int, wallet):
-        self.subtensor = subtensor
-        self.netuid = netuid
-        self.wallet = wallet
+class AbstractBittensorSubtensorContact(ABC):
+    @abstractmethod
+    def sync_metagraph(
+        self,
+        metagraph: Metagraph,
+        *,
+        subtensor: Subtensor,
+        block: int | None = None,
+        lite: bool | None = None,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_own_public_key(
+        self,
+        *,
+        subtensor: Subtensor,
+        netuid: int,
+        hotkey: str,
+    ) -> PublicKey | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def upload_public_key(
+        self,
+        *,
+        subtensor: Subtensor,
+        wallet,
+        netuid: int,
+        public_key: PublicKey,
+        algorithm: CertificateAlgorithmEnum,
+    ) -> None:
+        raise NotImplementedError
+
+
+class BittensorSubtensorContact(AbstractBittensorSubtensorContact):
 
     def sync_metagraph(
         self,
         metagraph: Metagraph,
         *,
+        subtensor: Subtensor,
         block: int | None = None,
         lite: bool | None = None,
     ) -> None:
@@ -49,23 +82,40 @@ class BittensorSubtensorContact:
             metagraph,
             block=block,
             lite=lite,
-            subtensor=self.subtensor,
+            subtensor=subtensor,
         )
 
-    async def get_own_public_key(self) -> PublicKey | None:
-        return await asyncio.to_thread(self._get_own_public_key)
+    async def get_own_public_key(
+        self,
+        *,
+        subtensor: Subtensor,
+        netuid: int,
+        hotkey: str,
+    ) -> PublicKey | None:
+        return await asyncio.to_thread(self._get_own_public_key, subtensor, netuid, hotkey)
 
     async def upload_public_key(
         self,
+        *,
+        subtensor: Subtensor,
+        wallet,
+        netuid: int,
         public_key: PublicKey,
         algorithm: CertificateAlgorithmEnum,
     ) -> None:
-        await asyncio.to_thread(self._upload_public_key, public_key, algorithm)
+        await asyncio.to_thread(
+            self._upload_public_key,
+            subtensor,
+            wallet,
+            netuid,
+            public_key,
+            algorithm,
+        )
 
-    def _get_own_public_key(self) -> PublicKey | None:
-        certificate = self.subtensor.query_subtensor(
+    def _get_own_public_key(self, subtensor: Subtensor, netuid: int, hotkey: str) -> PublicKey | None:
+        certificate = subtensor.query_subtensor(
             name='NeuronCertificates',
-            params=[self.netuid, self.wallet.hotkey.ss58_address],
+            params=[netuid, hotkey],
         )
         if certificate is None:
             return None
@@ -75,8 +125,15 @@ class BittensorSubtensorContact:
             return None
         return decoded_certificate.hex_data
 
-    def _upload_public_key(self, public_key: PublicKey, algorithm: CertificateAlgorithmEnum) -> None:
-        axon_info = self._get_current_axon_info()
+    def _upload_public_key(
+        self,
+        subtensor: Subtensor,
+        wallet,
+        netuid: int,
+        public_key: PublicKey,
+        algorithm: CertificateAlgorithmEnum,
+    ) -> None:
+        axon_info = self._get_current_axon_info(subtensor, wallet, netuid)
         new_ip = '1.1.1.1' if axon_info is None else str(axon_info.ip)
         new_port = 1 if axon_info is None else axon_info.port
         new_protocol = 0 if axon_info is None else axon_info.protocol
@@ -84,23 +141,33 @@ class BittensorSubtensorContact:
         certificate_data = bytes([algorithm]) + bytes.fromhex(public_key)
 
         serve_extrinsic(
-            self.subtensor,
-            self.wallet,
+            subtensor,
+            wallet,
             new_ip,
             new_port,
             new_protocol,
-            self.netuid,
+            netuid,
             certificate=certificate_data,  # type: ignore[arg-type]
             placeholder1=new_placeholder1,
             wait_for_inclusion=True,
             wait_for_finalization=True,
         )
 
-    def _get_current_axon_info(self):
-        neuron = self.subtensor.get_neuron_for_pubkey_and_subnet(
-            self.wallet.hotkey.ss58_address,
-            netuid=self.netuid,
+    def _get_current_axon_info(self, subtensor: Subtensor, wallet, netuid: int):
+        neuron = subtensor.get_neuron_for_pubkey_and_subnet(
+            wallet.hotkey.ss58_address,
+            netuid=netuid,
         )
         if neuron is None or neuron.axon_info is None or not neuron.axon_info.is_serving:
             return None
         return neuron.axon_info
+
+
+_bittensor_subtensor_contact_instance: AbstractBittensorSubtensorContact | None = None
+
+
+def bittensor_subtensor_contact() -> AbstractBittensorSubtensorContact:
+    global _bittensor_subtensor_contact_instance
+    if _bittensor_subtensor_contact_instance is None:
+        _bittensor_subtensor_contact_instance = BittensorSubtensorContact()
+    return _bittensor_subtensor_contact_instance

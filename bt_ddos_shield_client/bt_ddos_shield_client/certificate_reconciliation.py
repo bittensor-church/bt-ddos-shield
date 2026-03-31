@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from bt_ddos_shield_client.certificates import Certificate
-from bt_ddos_shield_client.contacts import CertificateContact
+from bt_ddos_shield_client.types import PublicKey
 
 
 @dataclass
 class CertificateReconciler:
-    contact: CertificateContact
+    get_own_public_key: Callable[[], Awaitable[PublicKey | None]]
+    upload_public_key: Callable[[PublicKey, int], Awaitable[None]]
     certificate: Certificate
     disabled: bool = False
     match_ttl_seconds: float = 300.0
@@ -30,12 +32,12 @@ class CertificateReconciler:
         if self.disabled or self._is_match_cached():
             return
 
-        public_key = await self.contact.get_own_public_key()
+        public_key = await self.get_own_public_key()
         if public_key == self.certificate.public_key:
             self._cache_match()
             return
 
-        await self.contact.upload_public_key(
+        await self.upload_public_key(
             self.certificate.public_key,
             self.certificate.algorithm,
         )
