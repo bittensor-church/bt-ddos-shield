@@ -21,7 +21,14 @@ server-shield-chain-writer = "server_shield.chain_writer.cli:main"
 [dependency-groups]
 dev = [
     "pytest>=9,<10",
+    "testcontainers>=4.13,<5",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "subtensor_integration: tests that require a disposable local subtensor environment",
+]
+addopts = "-m 'not subtensor_integration'"
 
 [build-system]
 requires = ["hatchling>=1.27.0"]
