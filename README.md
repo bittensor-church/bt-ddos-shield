@@ -41,6 +41,8 @@ For requests, feedback, or questions, **join us on the [ComputeHorde Discord cha
 
 Also, be sure to check out our subnet and other products at [ComputeHorde](https://computehorde.io).
 
+Contributor and agent standards live in [docs/engineering-standards.md](docs/engineering-standards.md).
+
 
 ## Running Shield on server (Miner) side
 
