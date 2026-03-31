@@ -2,12 +2,12 @@
 
 ## Summary
 
-Refactor `bt_ddos_shield_client` so certificate reconciliation happens in the chain contact layer during neuron fetching rather than during `ShieldClient` startup. `ShieldClient` should stop acting as a context manager and stop depending on `subtensor`. The chain contact layer should keep a TTL-cached answer to a single question: does the on-chain certificate match the current local certificate?
+Refactor `bt_ddos_shield_client` so certificate reconciliation happens during neuron fetching rather than during `ShieldClient` startup. `ShieldClient` should stop acting as a context manager and stop depending on `subtensor`. The chain contact layer should remain a thin adapter over subtensor communication, while a separate reconciliation layer should keep a TTL-cached answer to a single question: does the on-chain certificate match the current local certificate?
 
 ## Goals
 
 - Remove chain-specific responsibilities from `ShieldClient`.
-- Move own-certificate comparison and upload into the subtensor contact implementations.
+- Move own-certificate comparison and upload orchestration out of `ShieldClient` and into a dedicated reconciliation layer.
 - Perform certificate reconciliation on the neuron-fetch path.
 - Expose a public `ShieldedSubnetReference.from_bittensor(...)` constructor.
 - Reuse a thread pool for `ShieldMetagraph.sync()` async bridging instead of spawning throwaway threads.
@@ -28,14 +28,15 @@ Refactor `bt_ddos_shield_client` so certificate reconciliation happens in the ch
 
 ## Chosen Approach
 
-Use the existing contact layer as the sole owner of on-chain certificate reconciliation.
+Keep the contact layer thin and introduce a dedicated certificate reconciliation layer.
 
 - `ShieldClient` becomes a plain helper that loads or creates the local certificate and resolves shield addresses from manifests.
-- `BittensorSubtensorContact` and `TurboBittensorSubtensorContact` become responsible for checking whether the local certificate matches the on-chain certificate and uploading it when needed.
+- `BittensorSubtensorContact` and `TurboBittensorSubtensorContact` remain thin adapters responsible only for fetching the current on-chain certificate and uploading a certificate payload.
+- A separate reconciliation object owns TTL state, comparison policy, and the decision to upload when needed.
 - `ShieldMetagraph.sync()` and `ShieldedSubnetReference.list_neurons()` trigger certificate reconciliation as part of neuron fetching.
 - `ShieldedSubnetReference.from_bittensor(...)` becomes the public construction API for an already-created `turbobt.Bittensor`.
 
-This keeps manifest resolution isolated in `ShieldClient` and keeps all chain-specific behavior in chain-specific code.
+This keeps manifest resolution isolated in `ShieldClient`, keeps chain transport code mockable and minimal, and keeps reconciliation policy in one reusable place.
 
 ## Architecture
 
@@ -57,16 +58,35 @@ This keeps manifest resolution isolated in `ShieldClient` and keeps all chain-sp
 
 ### Contact Layer
 
-Each contact implementation should expose a public async method with behavior equivalent to:
+Each contact implementation should remain a thin async adapter over chain communication. It should expose only the minimum operations needed by higher layers, with behavior equivalent to:
 
-- `ensure_own_certificate_matches(local_certificate: Certificate) -> None`
+- `get_hotkey() -> str`
+- `get_own_public_key() -> PublicKey | None`
+- `upload_public_key(public_key: PublicKey, algorithm: CertificateAlgorithmEnum) -> None`
 
-This method is responsible for:
+The contact layer should not own:
 
-1. Fetching the current on-chain public key for the validator hotkey.
-2. Comparing it to the current local certificate public key.
+- TTL state
+- certificate comparison policy
+- retry / reconciliation orchestration
+- neuron-fetch workflow decisions
+
+This keeps it trivial to replace with mock implementations in tests.
+
+### Certificate Reconciliation Layer
+
+Add a separate reconciliation layer, for example a focused helper/service used by `ShieldMetagraph` and the shielded turbobt path.
+
+This layer should expose a public async method with behavior equivalent to:
+
+- `ensure_own_certificate_matches() -> None`
+
+The reconciler owns:
+
+1. Fetching the current on-chain public key through the contact adapter.
+2. Comparing it to the current local certificate public key from `ShieldClient`.
 3. Returning immediately when a non-expired TTL cache already says the on-chain cert matches this exact local public key.
-4. Uploading the local certificate if the on-chain value is missing or different.
+4. Uploading the local certificate through the contact adapter if the on-chain value is missing or different.
 5. Updating the TTL cache after a successful comparison or successful upload.
 
 The TTL cache stores only one semantic fact:
@@ -81,7 +101,7 @@ Certificate reconciliation is part of neuron fetching in this design.
 
 - If reading the current on-chain certificate fails, neuron fetching must fail.
 - If uploading the local certificate fails, neuron fetching must fail.
-- If the contact determines the on-chain certificate already matches the local one, neuron fetching proceeds normally.
+- If the reconciler determines the on-chain certificate already matches the local one, neuron fetching proceeds normally.
 
 There is no best-effort fallback for certificate read/write failures in this refactor.
 
@@ -91,7 +111,8 @@ There is no best-effort fallback for certificate read/write failures in this ref
 
 - construct a `ShieldClient` without any subtensor/contact dependency
 - construct the appropriate contact object separately
-- call the contact reconciliation method during `sync()`
+- construct the reconciliation layer separately
+- call the reconciliation layer during `sync()`
 - reuse a dedicated thread pool when calling `run_async_in_thread` from sync-time code
 
 `ShieldMetagraph.__init__()` should stop performing certificate upload work implicitly. The only certificate-related construction work left there should be local certificate loading via `ShieldClient`.
@@ -102,7 +123,8 @@ There is no best-effort fallback for certificate read/write failures in this ref
 
 - keep a `ShieldClient`
 - keep a contact object
-- have neuron-fetching paths call contact reconciliation before shield-address rewriting
+- keep a reconciliation object
+- have neuron-fetching paths call reconciliation before shield-address rewriting
 
 Add a public constructor:
 
@@ -130,11 +152,13 @@ The pool should be an internal implementation detail of `ShieldMetagraph`.
   - remove subtensor/contact dependency and upload logic
   - keep local certificate lifecycle and manifest resolution
 - `bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py`
-  - move certificate reconciliation orchestration to contact usage inside `sync()`
-  - add TTL-cached reconciliation logic to `BittensorSubtensorContact`
+  - wire contact + reconciliation usage inside `sync()`
+  - keep `BittensorSubtensorContact` transport-only
   - add reusable executor ownership for sync-time async bridging
+- `bt_ddos_shield_client/bt_ddos_shield_client/certificate_reconciliation.py`
+  - add a focused reconciliation module/class that owns TTL state and certificate matching logic
 - `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
-  - move certificate reconciliation into `TurboBittensorSubtensorContact`
+  - use the new reconciliation layer with `TurboBittensorSubtensorContact`
   - remove `ShieldClient` context-manager usage
   - add `ShieldedSubnetReference.from_bittensor(...)`
 - `bt_ddos_shield_client/bt_ddos_shield_client/internal.py`
@@ -153,8 +177,9 @@ No test additions or refactors are planned in this change. Existing tests may ne
 ## Acceptance Criteria
 
 - `ShieldClient` has no context-manager behavior and no subtensor/contact dependency.
-- Certificate reconciliation lives in the contact layer for both bittensor and turbobt integrations.
+- Contact objects remain thin transport adapters.
+- Certificate reconciliation lives in a separate reusable layer for both bittensor and turbobt integrations.
 - Neuron fetching fails if certificate read or write fails.
-- Contact-level TTL caching tracks whether the on-chain cert matches the current local cert.
+- Reconciliation-layer TTL caching tracks whether the on-chain cert matches the current local cert.
 - `ShieldedSubnetReference.from_bittensor(...)` is public.
 - `ShieldMetagraph.sync()` uses a reusable thread pool for async bridging.
