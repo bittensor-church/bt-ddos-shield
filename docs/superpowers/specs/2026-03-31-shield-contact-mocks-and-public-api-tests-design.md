@@ -2,7 +2,7 @@
 
 ## Summary
 
-Add production-package mock implementations for the shield contact abstractions so downstream projects can use them in their own tests, and add public-API-focused tests in this repository that patch only the contact factory functions plus HTTP responses. The mock contacts must be declarative, mutable within a single test, and fully instrumented so tests can assert reconciliation and upload behavior, including on-chain/local public-key desynchronization and TTL behavior.
+Add production-package mock implementations for the shield contact abstractions so downstream projects can use them in their own tests, and add public-API-focused tests in this repository that patch only the contact factory functions plus HTTP responses. The mock contacts must be declarative, mutable within a single test, and fully instrumented so tests can assert reconciliation and upload behavior, including on-chain/local public-key desynchronization and TTL behavior. On top of that, provide a higher-level fixture-style helper layer for downstream projects that hides contact mocking and manifest-response setup behind declarative helpers.
 
 ## Goals
 
@@ -11,6 +11,7 @@ Add production-package mock implementations for the shield contact abstractions 
 - Make the mocks mutable during a single test so chain state and upload behavior can change between calls.
 - Record all contact calls in a structured way for direct assertions in tests.
 - Expand tests to cover public behavior through `ShieldMetagraph`, `ShieldedBittensor`, and `ShieldedSubnetReference.from_bittensor(...)`.
+- Provide downstream-facing fixture-style helpers that hide contact patching and manifest mocking under the hood.
 - Use committed real certificate/key fixtures and clock control for TTL coverage.
 
 ## Non-Goals
@@ -35,10 +36,11 @@ Add production-package mock contacts with declarative scenario APIs and structur
 - `MockTurboBittensorSubtensorContact` will implement `AbstractTurboBittensorSubtensorContact`.
 - Both mock classes will live in the production package beside the existing contact abstractions so downstream projects can import them directly.
 - Tests in this repository will patch only `bittensor_subtensor_contact()` / `turbo_bittensor_subtensor_contact()` and HTTP responses.
+- A fixture-style helper layer will sit on top of those mocks for downstream consumers that do not want to handcraft HTTP manifest stubs or contact state in every test.
 - Tests will use committed fixture certificates and keys from the repository.
 - TTL coverage will use `freezegun` or an equivalent time-freezing library.
 
-This keeps the mocking surface aligned with the actual public extension point: the contact factory functions.
+This keeps the low-level mocking surface aligned with the actual public extension point, while also offering a higher-level ergonomic test layer for downstream projects.
 
 ## Architecture
 
@@ -119,6 +121,25 @@ The tests should not patch:
 - contact instance methods directly
 - upstream `Metagraph.sync()` / `SubnetReference.list_neurons()` implementations
 
+### Downstream Fixture-Style Helper Layer
+
+On top of the low-level mock contacts, add a higher-level helper layer intended for downstream project tests.
+
+This layer should:
+
+- expose declarative helpers for preparing validators, miners, shielded endpoints, and on-chain certificate state
+- hide direct HTTP manifest mocking from downstream tests
+- hide direct contact factory patching from downstream tests
+- still avoid any real subtensor communication
+
+The downstream helper API should remain outcome-focused. The caller should be able to express intent like:
+
+- prepare a network where neurons A and C are shielded and B is not
+- prepare a validator whose local cert mismatches the on-chain cert
+- prepare a manifest response for a given miner without manually crafting encrypted payloads
+
+This helper layer may patch contact factories and install HTTP stubs internally, but that wiring should be invisible to downstream test authors.
+
 ### Fixture Layout
 
 Commit real certificate/key fixture material under:
@@ -161,6 +182,8 @@ All new tests should touch the public API only.
 - freeze or advance time for TTL checks
 - use committed certificate/key fixtures
 
+Repository tests should use mock contacts plus mocked HTTP responses directly. They should not introduce a second declarative “shielded/unshielded neuron” abstraction at the repository test level.
+
 ### Required Coverage
 
 For `ShieldMetagraph`:
@@ -187,12 +210,21 @@ For the turbobt path:
 - read failure surfaces through the public API
 - upload failure surfaces through the public API
 
+For the downstream fixture-style helper layer:
+
+- helper-prepared mixed shielded/unshielded scenarios produce the correct public API results
+- helper-prepared certificate mismatch scenarios trigger the expected public API behavior
+- helper-prepared TTL scenarios produce the correct public API behavior when time is frozen and advanced
+
+These tests should assert final public behavior only. They should not assert helper internals, call logs, or low-level mocking details.
+
 ### Testing Style
 
 - Prefer real certificate fixtures over synthetic placeholder values.
 - Prefer asserting observable behavior plus contact call logs over internal state.
 - Keep the only external I/O stub as HTTP manifest responses.
 - Keep mocking minimal and localized to the contact factory functions.
+- For the downstream fixture-style helper layer, assert public outcomes only and avoid granular internal assertions.
 
 ## File-Level Changes
 
@@ -200,10 +232,13 @@ For the turbobt path:
   - add `MockBittensorSubtensorContact`
 - `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/contacts.py`
   - add `MockTurboBittensorSubtensorContact`
+- `bt_ddos_shield_client/bt_ddos_shield_client/testing.py`
+  - add downstream-facing fixture-style helpers that wrap mock contacts and manifest setup
 - `bt_ddos_shield_client/tests/fixtures/certs/`
   - add committed certificate/key fixtures
 - `bt_ddos_shield_client/tests/...`
   - rewrite tests to use public APIs, patched contact factories, HTTP stubs, and time freezing
+  - add public-API tests for the fixture-style helper layer
 - `bt_ddos_shield_client/pyproject.toml`
   - add `freezegun` to the test dependency group if it is not already present
 
@@ -219,6 +254,8 @@ For the turbobt path:
 - Production-package mock contacts exist for both abstract contact types.
 - Mock contacts can be reconfigured mid-test and expose a structured call log.
 - Repository tests patch only the contact factory functions plus HTTP responses.
+- Repository tests use mock contacts plus HTTP stubs directly, without a repository-only declarative shielded/unshielded abstraction.
+- Downstream-facing fixture-style helpers exist and hide contact patching plus manifest setup internally.
 - Tests use committed real certificate/key fixtures.
 - TTL behavior is covered with `freezegun` or an equivalent clock-freezing tool.
 - Public APIs are the primary test surface for reconciliation and shield-address behavior.
