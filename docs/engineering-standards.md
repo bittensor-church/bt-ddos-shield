@@ -9,7 +9,7 @@ These rules apply to both humans and agents.
 ### Required
 
 - Put communication with external control-plane services behind a thin adapter layer.
-- In this repository, communication with Subtensor or Bittensor clients belongs in a `Contact` implementation.
+- In this repository, Subtensor or Bittensor clients are examples of services that belong behind a `Contact` implementation.
 - Keep `Contact` implementations transport-oriented. They should translate calls and data, not own higher-level policy.
 - Put reconciliation, caching, orchestration, and business rules above the contact layer.
 - Make callers depend on the contact boundary, not on direct SDK calls.
@@ -44,9 +44,9 @@ These rules apply to both humans and agents.
 - Allow mock contacts to be mutated during a single test.
 - Record calls in a structured way so tests can assert externally visible behavior.
 - Configure mocks in domain terms:
-  - current listed neurons
-  - current synced metagraph result
-  - current on-chain certificate
+  - current listed items or records
+  - current synchronized adapter result
+  - current externally stored state
   - upload outcome
 
 ### Forbidden
@@ -88,7 +88,7 @@ def contact() -> AbstractContact:
 
 - Test behavior through public APIs.
 - Mock only true external boundaries that are expensive or inappropriate to run in-process.
-- In this repository, that usually means:
+- In this repository, examples usually include:
   - patching contact singleton factory functions
   - stubbing HTTP responses with `aioresponses`
 - Use real certificates, keys, and realistic domain objects in tests when practical.
@@ -138,9 +138,9 @@ def contact() -> AbstractContact:
 
 ### Good
 
-- High-level code calls `bittensor_subtensor_contact()` or `turbo_bittensor_subtensor_contact()`.
-- Tests patch those factory functions and drive `ShieldMetagraph.sync()` or `ShieldedSubnetReference.list_neurons()`.
-- Manifest behavior is exercised with real HTTP stubs and real certificates.
+- High-level code calls a contact factory or adapter accessor instead of reaching into a service SDK directly.
+- Tests patch that boundary and drive public APIs rather than internal helpers.
+- HTTP-backed behavior is exercised with realistic stubs and real cryptographic material when practical.
 - Mock contacts are reconfigured mid-test to simulate on-chain state changes.
 
 ### Bad
@@ -148,7 +148,7 @@ def contact() -> AbstractContact:
 - High-level code talks directly to Subtensor or Bittensor SDK objects outside the contact layer.
 - Tests patch private helpers instead of the external boundary.
 - Tests assert internal helper return types instead of public behavior.
-- Tests use placeholder objects when real `Neuron` or `NeuronInfo` instances are easy to build.
+- Tests use placeholder objects when realistic domain objects are easy to build.
 
 ## Review Checklist
 

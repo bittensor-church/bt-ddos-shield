@@ -57,6 +57,35 @@ The test suite stays at the public boundary:
 - production mock contacts drive certificate upload scenarios
 - `aioresponses` mocks `shield_manifest.json` responses over HTTP
 
+### Real Contact Integration Tests
+
+The real `BittensorSubtensorContact` and `TurboBittensorSubtensorContact` implementations also have Docker-backed integration tests under `bt_ddos_shield_client/tests/contacts`.
+
+Those tests are marked with `subtensor_integration`, so they are excluded from the default local pytest run.
+
+Run them explicitly from the repository root with:
+
+```bash
+uv run --group test pytest bt_ddos_shield_client/tests/contacts -m subtensor_integration -v
+```
+
+Or from inside the `bt_ddos_shield_client` directory:
+
+```bash
+uv run --project . --python 3.12 --group test pytest tests/contacts -m subtensor_integration -v
+```
+
+Behavior:
+
+- the tests start their own disposable local subtensor container
+- they create test wallets, create a subnet, register neurons, and then exercise only the public contact methods
+- they do not depend on files under `manual_tests/`
+
+Docker notes:
+
+- the tests follow the active Docker context automatically
+- if the active context uses an `ssh://...` Docker endpoint, the test environment needs the `paramiko` test dependency, which is already included in the `test` group
+
 ## Usage
 
 ```python
