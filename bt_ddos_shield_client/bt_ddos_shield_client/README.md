@@ -5,8 +5,11 @@ Standalone validator-side client package for BT DDoS Shield.
 ## Public API
 
 - `bt_ddos_shield_client.ShieldMetagraph`
-- `bt_ddos_shield_client.turbobt.ShieldedBittensor`
-- `bt_ddos_shield_client.turbobt.ShieldedSubnetReference`
+- `bt_ddos_shield_client.shielded_turbobt.ShieldedBittensor`
+- `bt_ddos_shield_client.shielded_turbobt.ShieldedSubnetReference`
+- `bt_ddos_shield_client.MockBittensorSubtensorContact`
+- `bt_ddos_shield_client.shielded_turbobt.MockTurboBittensorSubtensorContact`
+- `bt_ddos_shield_client.ShieldMetagraphTestRig`
 
 ## Behavior
 
@@ -50,8 +53,8 @@ uv run --project . --python 3.12 --group test pytest tests -v
 
 The test suite stays at the public boundary:
 
-- tests patch module-level `get_contact_instance(...)` accessors
-- a lightweight fake Subtensor contact surface drives certificate upload scenarios
+- tests patch `bittensor_subtensor_contact()` / `turbo_bittensor_subtensor_contact()`
+- production mock contacts drive certificate upload scenarios
 - `aioresponses` mocks `shield_manifest.json` responses over HTTP
 
 ## Usage
@@ -63,7 +66,7 @@ metagraph = ShieldMetagraph(wallet, netuid, subtensor=subtensor)
 ```
 
 ```python
-from bt_ddos_shield_client.turbobt import ShieldedBittensor
+from bt_ddos_shield_client.shielded_turbobt import ShieldedBittensor
 
 async with ShieldedBittensor(
     network,

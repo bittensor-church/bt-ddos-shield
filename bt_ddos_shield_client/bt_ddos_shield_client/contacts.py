@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import asyncio
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from bittensor import Subtensor
+from bittensor.core.chain_data import NeuronInfo
 from bittensor.core.extrinsics.serving import serve_extrinsic
 from bittensor.core.metagraph import Metagraph
 
@@ -58,12 +60,12 @@ class AbstractBittensorSubtensorContact(ABC):
     @abstractmethod
     async def upload_public_key(
         self,
+        public_key: PublicKey,
+        algorithm: CertificateAlgorithmEnum,
         *,
         subtensor: Subtensor,
         wallet,
         netuid: int,
-        public_key: PublicKey,
-        algorithm: CertificateAlgorithmEnum,
     ) -> None:
         raise NotImplementedError
 
@@ -96,12 +98,12 @@ class BittensorSubtensorContact(AbstractBittensorSubtensorContact):
 
     async def upload_public_key(
         self,
+        public_key: PublicKey,
+        algorithm: CertificateAlgorithmEnum,
         *,
         subtensor: Subtensor,
         wallet,
         netuid: int,
-        public_key: PublicKey,
-        algorithm: CertificateAlgorithmEnum,
     ) -> None:
         await asyncio.to_thread(
             self._upload_public_key,
@@ -161,6 +163,103 @@ class BittensorSubtensorContact(AbstractBittensorSubtensorContact):
         if neuron is None or neuron.axon_info is None or not neuron.axon_info.is_serving:
             return None
         return neuron.axon_info
+
+
+@dataclass(frozen=True)
+class BittensorContactCall:
+    method: str
+    netuid: int | None = None
+    hotkey: str | None = None
+    public_key: PublicKey | None = None
+    block: int | None = None
+    lite: bool | None = None
+
+
+@dataclass
+class MockBittensorSubtensorContact(AbstractBittensorSubtensorContact):
+    own_public_key: PublicKey | None = None
+    own_public_key_exception: Exception | None = None
+    upload_exception: Exception | None = None
+    sync_neurons: list[NeuronInfo] = field(default_factory=list)
+    calls: list[BittensorContactCall] = field(default_factory=list)
+
+    def set_metagraph_sync(self, neurons: list[NeuronInfo]) -> None:
+        self.sync_neurons = list(neurons)
+
+    def set_own_certificate(
+        self,
+        public_key: PublicKey | None,
+        *,
+        exception: Exception | None = None,
+    ) -> None:
+        self.own_public_key = public_key
+        self.own_public_key_exception = exception
+
+    def set_upload_behavior(self, exception: Exception | None = None) -> None:
+        self.upload_exception = exception
+
+    def reset_calls(self) -> None:
+        self.calls.clear()
+
+    def sync_metagraph(
+        self,
+        metagraph: Metagraph,
+        *,
+        subtensor: Subtensor,
+        block: int | None = None,
+        lite: bool | None = None,
+    ) -> None:
+        self.calls.append(
+            BittensorContactCall(
+                method='sync_metagraph',
+                netuid=metagraph.netuid,
+                block=block,
+                lite=lite,
+            )
+        )
+        metagraph.neurons = list(self.sync_neurons)
+        metagraph.axons = [neuron.axon_info for neuron in self.sync_neurons]
+        if lite is not None:
+            metagraph.lite = lite
+
+    async def get_own_public_key(
+        self,
+        *,
+        subtensor: Subtensor,
+        netuid: int,
+        hotkey: str,
+    ) -> PublicKey | None:
+        self.calls.append(
+            BittensorContactCall(
+                method='get_own_public_key',
+                netuid=netuid,
+                hotkey=hotkey,
+            )
+        )
+        if self.own_public_key_exception is not None:
+            raise self.own_public_key_exception
+        return self.own_public_key
+
+    async def upload_public_key(
+        self,
+        public_key: PublicKey,
+        algorithm: CertificateAlgorithmEnum,
+        *,
+        subtensor: Subtensor,
+        wallet,
+        netuid: int,
+    ) -> None:
+        self.calls.append(
+            BittensorContactCall(
+                method='upload_public_key',
+                netuid=netuid,
+                public_key=public_key,
+            )
+        )
+        if self.upload_exception is not None:
+            raise self.upload_exception
+        self.own_public_key = public_key
+        self.own_public_key_exception = None
 
 
 _bittensor_subtensor_contact_instance: AbstractBittensorSubtensorContact | None = None
