@@ -103,6 +103,24 @@ def contact() -> AbstractContact:
 - Do not mock internal methods just to force code through a branch when a public API test can cover it.
 - Do not replace real domain objects with placeholder objects if constructing the real object is practical.
 
+## Real Adapter Integration Testing Rules
+
+### Required
+
+- Every real external-service adapter must have separate tests for the real implementation.
+- Those tests must live in dedicated files.
+- Those tests must exercise only public adapter methods.
+- Those tests may be heavy integration tests.
+- Those tests should be opt-in locally and expected in CI.
+- When practical, those tests should create their own disposable external-service environment.
+- Those tests must not depend on unrelated manual-test directories for runtime dependencies.
+
+### Forbidden
+
+- Do not rely only on mocks for real adapter correctness.
+- Do not test private adapter helpers in place of real adapter behavior.
+- Do not hide real adapter tests inside unrelated wrapper test modules.
+
 ## Stateful Infrastructure Exception
 
 ### Required

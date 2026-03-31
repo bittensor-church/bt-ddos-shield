@@ -23,6 +23,13 @@ def decode_subtensor_certificate_info(subtensor_certificate_info: dict[str, Any]
     if isinstance(data, str):
         return SubtensorCertificate(algorithm, data)
 
+    if (
+        isinstance(data, (list, tuple))
+        and len(data) == 1
+        and isinstance(data[0], (bytes, bytearray, list, tuple))
+    ):
+        data = data[0]
+
     return SubtensorCertificate(algorithm, bytes(data).hex())
 
 

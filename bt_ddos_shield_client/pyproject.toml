@@ -24,6 +24,8 @@ test = [
     "pytest-asyncio~=1.0.0",
     "aioresponses~=0.7.8",
     "freezegun~=1.5.1",
+    "paramiko~=3.5",
+    "testcontainers~=4.13.2",
     "bt_ddos_shield_client[turbobt]",
 ]
 
@@ -38,8 +40,11 @@ packages = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "-s"
+addopts = '-s -m "not subtensor_integration"'
 asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "subtensor_integration: real local-subtensor integration tests for contact implementations",
+]
 testpaths = [
     "tests",
 ]
