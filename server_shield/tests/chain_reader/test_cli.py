@@ -3,6 +3,11 @@ import os
 import subprocess
 from types import SimpleNamespace
 
+from server_shield.subtensor_contact import (
+    AbstractSubtensorContact,
+    MockSubtensorContact,
+    subtensor_contact,
+)
 from server_shield.chain_reader.chain import ValidatorOnChain
 from server_shield.chain_reader.cli import _run_once, main
 from server_shield.shared import state_store
@@ -14,6 +19,11 @@ from server_shield.shared.state_store import (
     write_desired_domains,
     write_root_domain,
 )
+
+
+def test_subtensor_contact_types_are_importable() -> None:
+    assert callable(subtensor_contact)
+    assert issubclass(MockSubtensorContact, AbstractSubtensorContact)
 
 
 def _write_example_files(example_dir: Path) -> None:
