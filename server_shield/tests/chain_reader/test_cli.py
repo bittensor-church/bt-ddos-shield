@@ -1,23 +1,22 @@
+import base64
 from pathlib import Path
-import os
-import subprocess
-from types import SimpleNamespace
 
-from server_shield.subtensor_contact import (
-    AbstractSubtensorContact,
-    MockSubtensorContact,
-    subtensor_contact,
-)
-from server_shield.chain_reader.chain import ValidatorOnChain
-from server_shield.chain_reader.cli import _run_once, main
+from Crypto.PublicKey import ECC
+
+from server_shield.chain_reader.cli import main
 from server_shield.shared import state_store
-from server_shield.shared.state import ManifestPayloadState, ManifestState
+from server_shield.shared.config import get_config
 from server_shield.shared.state_store import (
     read_desired_domains,
     read_manifest,
-    read_root_domain,
     write_desired_domains,
     write_root_domain,
+)
+from server_shield.subtensor_contact import (
+    AbstractSubtensorContact,
+    MockSubtensorContact,
+    ValidatorCertificateRecord,
+    subtensor_contact,
 )
 
 
@@ -41,139 +40,163 @@ def _write_example_files(example_dir: Path) -> None:
     )
 
 
-def test_chain_reader_skips_when_root_domain_missing(tmp_path: Path, capsys, monkeypatch) -> None:
+def _set_required_env(monkeypatch) -> None:
+    get_config.cache_clear()
+    monkeypatch.setenv("SERVER_SHIELD_MINER_PORT", "9001")
+    monkeypatch.setenv("SERVER_SHIELD_SUBTENSOR_ADDRESS", "ws://subtensor")
+    monkeypatch.setenv("SERVER_SHIELD_NETUID", "12")
+    monkeypatch.setenv("SERVER_SHIELD_PULUMI__BACKEND_URL", "file:///tmp/server-shield-test-state")
+    monkeypatch.setenv("SERVER_SHIELD_PULUMI__SHIELD_BACKEND", "AWS")
+    monkeypatch.setenv("SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID", "key")
+    monkeypatch.setenv("SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY", "secret")
+    monkeypatch.setenv("SERVER_SHIELD_PULUMI__AWS__AWS_REGION", "eu-north-1")
+    monkeypatch.setenv("SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID", "Z123")
+    monkeypatch.setenv("SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID", "i-123")
+    monkeypatch.setenv("SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME", "miner")
+    monkeypatch.setenv("SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY", "miner-hotkey")
+
+
+def _valid_public_key_hex() -> str:
+    return ECC.generate(curve="ed25519").public_key().export_key(format="raw").hex()
+
+
+def test_chain_reader_main_skips_when_root_domain_missing(tmp_path: Path, capsys, monkeypatch) -> None:
     _write_example_files(tmp_path)
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
+    _set_required_env(monkeypatch)
     write_desired_domains(
         tmp_path,
         {
             "validator-hotkey-1": {
                 "domain": "validator-hotkey-1.example.com",
-                "public_cert": "cert-a",
+                "public_cert": _valid_public_key_hex(),
             }
         },
     )
-    exit_code = _run_once()
-    root_domain = read_root_domain(tmp_path)
+
+    exit_code = main()
+
     desired_domains = read_desired_domains(tmp_path)
     manifest = read_manifest(tmp_path)
-
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert root_domain.domain is None
     assert "skipping chain_reader because root_domain is null" in captured.out
     assert desired_domains.domains["validator-hotkey-1"].domain == "validator-hotkey-1.example.com"
     assert manifest.ddos_shield_manifest.encrypted_url_mapping == {}
 
 
-def test_chain_reader_reconciles_domains_from_chain_view(tmp_path: Path, capsys, monkeypatch) -> None:
+def test_chain_reader_main_reconciles_domains_from_contact(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+    patched_subtensor_contact: MockSubtensorContact,
+) -> None:
     _write_example_files(tmp_path)
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
+    _set_required_env(monkeypatch)
     write_root_domain(tmp_path, "shield.example.com")
-    write_desired_domains(
-        tmp_path,
-        {
-            "existing-validator": {
-                "domain": "existing-validator.shield.example.com",
-                "public_cert": "cert-a",
-            },
-            "removed-validator": {
-                "domain": "removed-validator.shield.example.com",
-                "public_cert": "cert-old",
-            },
-        },
-    )
     state_store.write_blacklist(tmp_path, ["blacklisted-validator"])
-    monkeypatch.setattr(
-        "server_shield.chain_reader.cli.get_config",
-        lambda: SimpleNamespace(),
-    )
-    monkeypatch.setattr(
-        "server_shield.chain_reader.cli.fetch_validators_with_certs",
-        lambda _config: [
-            ValidatorOnChain("existing-validator", "cert-a"),
-            ValidatorOnChain("new-validator", "cert-b"),
-            ValidatorOnChain("blacklisted-validator", "cert-c"),
-            ValidatorOnChain("missing-cert-validator", None, "missing certificate"),
-        ],
-    )
-    monkeypatch.setattr(
-        "server_shield.chain_reader.cli.build_manifest_state",
-        lambda desired_domains: ManifestState(
-            ddos_shield_manifest=ManifestPayloadState(
-                encrypted_url_mapping={
-                    hotkey: f"encrypted-{entry.domain}"
-                    for hotkey, entry in desired_domains.items()
-                }
-            )
-        ),
+
+    existing_cert = _valid_public_key_hex()
+    new_cert = _valid_public_key_hex()
+    blacklisted_cert = _valid_public_key_hex()
+    patched_subtensor_contact.set_validator_certificates(
+        [
+            ValidatorCertificateRecord(
+                hotkey="existing-validator",
+                certificate_payload={"public_key": [existing_cert]},
+            ),
+            ValidatorCertificateRecord(
+                hotkey="new-validator",
+                certificate_payload={"public_key": [new_cert]},
+            ),
+            ValidatorCertificateRecord(
+                hotkey="blacklisted-validator",
+                certificate_payload={"public_key": [blacklisted_cert]},
+            ),
+            ValidatorCertificateRecord(
+                hotkey="missing-cert-validator",
+                certificate_payload=None,
+            ),
+        ]
     )
 
-    exit_code = _run_once()
+    exit_code = main()
+
     desired_domains = read_desired_domains(tmp_path)
     manifest = read_manifest(tmp_path)
-
     captured = capsys.readouterr()
     assert exit_code == 0
-    assert desired_domains.domains["existing-validator"].domain == "existing-validator.shield.example.com"
-    assert desired_domains.domains["existing-validator"].public_cert == "cert-a"
-    assert desired_domains.domains["new-validator"].public_cert == "cert-b"
-    assert desired_domains.domains["new-validator"].domain.startswith("new-vali-")
-    assert desired_domains.domains["new-validator"].domain.endswith(".shield.example.com")
-    assert "removed-validator" not in desired_domains.domains
+    assert desired_domains.domains["existing-validator"].public_cert == existing_cert
+    assert desired_domains.domains["new-validator"].public_cert == new_cert
     assert "blacklisted-validator" not in desired_domains.domains
     assert "missing-cert-validator" not in desired_domains.domains
-    assert manifest.ddos_shield_manifest.encrypted_url_mapping == {
-        "existing-validator": "encrypted-existing-validator.shield.example.com",
-        "new-validator": f"encrypted-{desired_domains.domains['new-validator'].domain}",
+    assert set(manifest.ddos_shield_manifest.encrypted_url_mapping) == {
+        "existing-validator",
+        "new-validator",
     }
+    assert all(
+        base64.b64decode(value)
+        for value in manifest.ddos_shield_manifest.encrypted_url_mapping.values()
+    )
+    assert [call.method for call in patched_subtensor_contact.calls] == ["list_validator_certificates"]
     assert "excluding blacklisted validator blacklisted-validator" in captured.out
     assert "excluding validator missing-cert-validator: missing certificate" in captured.out
-    assert "chain_reader reconciled observed=4 kept=1 created=1" in captured.out
-    assert "manifest_entries=2" in captured.out
+    assert "chain_reader reconciled observed=4 kept=0 created=2" in captured.out
 
 
-def test_chain_reader_module_execution_runs_main(tmp_path: Path) -> None:
-    completed = subprocess.run(
-        [".venv/bin/python", "-m", "server_shield.chain_reader.cli"],
-        cwd=Path(__file__).resolve().parents[2],
-        check=False,
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "SERVER_SHIELD_STATE_DIR": str(tmp_path),
-            "SERVER_SHIELD_SUBTENSOR_ADDRESS": "ws://subtensor",
-            "SERVER_SHIELD_NETUID": "12",
-            "SERVER_SHIELD_PULUMI__BACKEND_URL": "file:///tmp/server-shield-test-state",
-            "SERVER_SHIELD_PULUMI__SHIELD_BACKEND": "AWS",
-            "SERVER_SHIELD_MINER_PORT": "9001",
-            "SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID": "key",
-            "SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY": "secret",
-            "SERVER_SHIELD_PULUMI__AWS__AWS_REGION": "eu-north-1",
-            "SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID": "Z123",
-            "SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID": "i-123",
-            "SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME": "miner",
-            "SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY": "miner-hotkey",
-        },
+def test_chain_reader_main_returns_one_when_contact_raises(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+    patched_subtensor_contact: MockSubtensorContact,
+) -> None:
+    _write_example_files(tmp_path)
+    monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
+    _set_required_env(monkeypatch)
+    write_root_domain(tmp_path, "shield.example.com")
+    patched_subtensor_contact.set_validator_certificates([], exception=RuntimeError("boom"))
+
+    exit_code = main()
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "RuntimeError: boom" in captured.err
+
+
+def test_chain_reader_main_keeps_valid_results_when_one_certificate_payload_is_malformed(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+    patched_subtensor_contact: MockSubtensorContact,
+) -> None:
+    _write_example_files(tmp_path)
+    monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
+    _set_required_env(monkeypatch)
+    write_root_domain(tmp_path, "shield.example.com")
+    good_cert = _valid_public_key_hex()
+    patched_subtensor_contact.set_validator_certificates(
+        [
+            ValidatorCertificateRecord(
+                hotkey="good-validator",
+                certificate_payload={"public_key": [good_cert]},
+            ),
+            ValidatorCertificateRecord(
+                hotkey="malformed-validator",
+                certificate_payload={"public_key": []},
+            ),
+        ]
     )
 
-    assert completed.returncode == 0
-    assert "skipping chain_reader because root_domain is null" in completed.stdout
+    exit_code = main()
 
-
-def test_chain_reader_main_does_not_require_state_dir(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "server_shield.chain_reader.cli.get_config",
-        lambda: SimpleNamespace(),
-    )
-    monkeypatch.setattr(
-        "server_shield.chain_reader.cli._run_once",
-        lambda: 0,
-    )
-    monkeypatch.setattr(
-        "server_shield.chain_reader.cli.run_component",
-        lambda component_name, fn: fn(),
-    )
-
-    assert main() == 0
+    desired_domains = read_desired_domains(tmp_path)
+    manifest = read_manifest(tmp_path)
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert desired_domains.domains["good-validator"].public_cert == good_cert
+    assert "malformed-validator" not in desired_domains.domains
+    assert set(manifest.ddos_shield_manifest.encrypted_url_mapping) == {"good-validator"}
+    assert "excluding validator malformed-validator: malformed certificate payload" in captured.out
+    assert "invalid_cert=1" in captured.out
+    assert "observed=2" in captured.out

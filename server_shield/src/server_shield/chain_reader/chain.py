@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import bittensor
-
-from server_shield.shared.config import AppConfig
+from server_shield.subtensor_contact import AbstractSubtensorContact
 
 
 @dataclass(frozen=True)
@@ -33,29 +31,19 @@ def _decode_certificate_payload(payload: dict[str, Any] | None) -> tuple[str | N
         return None, "malformed certificate payload"
 
 
-def fetch_validators_with_certs(config: AppConfig) -> list[ValidatorOnChain]:
-    subtensor = bittensor.subtensor(config.subtensor_address)
-    metagraph = bittensor.metagraph(
-        netuid=config.netuid,
-        subtensor=subtensor,
-    )
-
+def fetch_validators_with_certs(
+    *,
+    contact: AbstractSubtensorContact,
+    netuid: int,
+) -> list[ValidatorOnChain]:
     validators: list[ValidatorOnChain] = []
-    for hotkey, permit in zip(metagraph.hotkeys, metagraph.validator_permit, strict=False):
-        if not bool(permit):
-            continue
-
-        certificate = subtensor.query_subtensor(
-            name="NeuronCertificates",
-            params=[config.netuid, hotkey],
-        )
-        public_cert, invalid_reason = _decode_certificate_payload(certificate)
+    for record in contact.list_validator_certificates(netuid=netuid):
+        public_cert, invalid_reason = _decode_certificate_payload(record.certificate_payload)
         validators.append(
             ValidatorOnChain(
-                hotkey=hotkey,
+                hotkey=record.hotkey,
                 public_cert=public_cert,
                 cert_invalid_reason=invalid_reason,
             )
         )
-
     return validators

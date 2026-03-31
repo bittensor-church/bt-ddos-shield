@@ -11,6 +11,7 @@ from server_shield.shared.state_store import (
     write_desired_domains,
     write_manifest,
 )
+from server_shield.subtensor_contact import subtensor_contact
 
 
 def _run_once() -> int:
@@ -23,7 +24,11 @@ def _run_once() -> int:
     config = get_config()
     blacklist = set(read_blacklist().root)
     current_domains = read_desired_domains().domains
-    validators = fetch_validators_with_certs(config)
+    contact = subtensor_contact(config.subtensor_address)
+    validators = fetch_validators_with_certs(
+        contact=contact,
+        netuid=config.netuid,
+    )
 
     for validator in validators:
         if validator.hotkey in blacklist:
