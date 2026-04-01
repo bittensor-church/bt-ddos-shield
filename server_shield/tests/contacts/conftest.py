@@ -28,8 +28,18 @@ def ws_endpoint(local_subtensor_env):
 
 
 @pytest.fixture(scope="session")
+def alice_wallet(local_subtensor_env):
+    return local_subtensor_env.alice_wallet
+
+
+@pytest.fixture(scope="session")
 def validator_wallet(local_subtensor_env):
     return local_subtensor_env.validator_wallet
+
+
+@pytest.fixture(scope="session")
+def validator_wallet_2(local_subtensor_env):
+    return local_subtensor_env.validator_wallet_2
 
 
 @pytest.fixture(scope="session")

@@ -20,6 +20,7 @@ server-shield-chain-writer = "server_shield.chain_writer.cli:main"
 
 [dependency-groups]
 dev = [
+    "paramiko>=3.5,<4",
     "pytest>=9,<10",
     "testcontainers>=4.13,<5",
 ]

@@ -34,6 +34,7 @@ class LocalSubtensorEnv:
     subtensor: Subtensor
     alice_wallet: Wallet
     validator_wallet: Wallet
+    validator_wallet_2: Wallet
     miner_wallet: Wallet
     netuid: int
 
@@ -128,6 +129,26 @@ def _make_wallet(wallet_root: Path, name: str, uri: str | None = None) -> Wallet
     return wallet
 
 
+def _wait_for_permit_states(
+    subtensor: Subtensor,
+    netuid: int,
+    *,
+    expected_permits: dict[str, bool],
+    timeout_seconds: float = 120.0,
+) -> None:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        metagraph = subtensor.metagraph(netuid=netuid)
+        permits_by_hotkey = {
+            hotkey: bool(permit)
+            for hotkey, permit in zip(metagraph.hotkeys, metagraph.validator_permit, strict=False)
+        }
+        if all(permits_by_hotkey.get(hotkey) is expected for hotkey, expected in expected_permits.items()):
+            return
+        time.sleep(1.0)
+    raise RuntimeError(f"validator permit state did not settle to {expected_permits!r}")
+
+
 def _resolve_docker_host() -> str | None:
     if os.environ.get("DOCKER_HOST"):
         parsed = urlparse(os.environ["DOCKER_HOST"])
@@ -186,12 +207,21 @@ def start_local_subtensor_env() -> LocalSubtensorEnv:
 
         alice_wallet = _make_wallet(wallet_root, "alice", "//Alice")
         validator_wallet = _make_wallet(wallet_root, "validator")
+        validator_wallet_2 = _make_wallet(wallet_root, "validator-2")
         miner_wallet = _make_wallet(wallet_root, "miner")
 
         transfer_extrinsic(
             subtensor,
             alice_wallet,
             validator_wallet.coldkeypub.ss58_address,
+            Balance.from_tao(50_000),
+            wait_for_inclusion=True,
+            wait_for_finalization=True,
+        )
+        transfer_extrinsic(
+            subtensor,
+            alice_wallet,
+            validator_wallet_2.coldkeypub.ss58_address,
             Balance.from_tao(50_000),
             wait_for_inclusion=True,
             wait_for_finalization=True,
@@ -227,6 +257,16 @@ def start_local_subtensor_env() -> LocalSubtensorEnv:
 
         burned_register_extrinsic(
             subtensor,
+            validator_wallet_2,
+            netuid,
+            wait_for_inclusion=True,
+            wait_for_finalization=True,
+        )
+        if not subtensor.is_hotkey_registered_on_subnet(validator_wallet_2.hotkey.ss58_address, netuid=netuid):
+            _wait_for_registration(subtensor, validator_wallet_2.hotkey.ss58_address, netuid)
+
+        burned_register_extrinsic(
+            subtensor,
             miner_wallet,
             netuid,
             wait_for_inclusion=True,
@@ -245,6 +285,33 @@ def start_local_subtensor_env() -> LocalSubtensorEnv:
         if not started:
             raise RuntimeError(f"failed to start local test subnet {netuid}: {message}")
 
+        subtensor.add_stake(
+            alice_wallet,
+            hotkey_ss58=validator_wallet.hotkey.ss58_address,
+            netuid=netuid,
+            amount=Balance.from_tao(100),
+            wait_for_inclusion=True,
+            wait_for_finalization=True,
+        )
+        subtensor.add_stake(
+            alice_wallet,
+            hotkey_ss58=validator_wallet_2.hotkey.ss58_address,
+            netuid=netuid,
+            amount=Balance.from_tao(90),
+            wait_for_inclusion=True,
+            wait_for_finalization=True,
+        )
+        _wait_for_permit_states(
+            subtensor,
+            netuid,
+            expected_permits={
+                alice_wallet.hotkey.ss58_address: True,
+                validator_wallet.hotkey.ss58_address: True,
+                validator_wallet_2.hotkey.ss58_address: True,
+                miner_wallet.hotkey.ss58_address: False,
+            },
+        )
+
         return LocalSubtensorEnv(
             container=container,
             ws_endpoint=ws_endpoint,
@@ -252,6 +319,7 @@ def start_local_subtensor_env() -> LocalSubtensorEnv:
             subtensor=subtensor,
             alice_wallet=alice_wallet,
             validator_wallet=validator_wallet,
+            validator_wallet_2=validator_wallet_2,
             miner_wallet=miner_wallet,
             netuid=netuid,
         )
