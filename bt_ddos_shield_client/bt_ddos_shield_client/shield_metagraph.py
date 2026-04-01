@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import os
@@ -59,18 +58,6 @@ class ShieldMetagraph(Metagraph):
             certificate_path=resolve_certificate_path(self.options.certificate_path),
         )
         self._certificate_reconciler = CertificateReconciler(
-            get_own_public_key=partial(
-                self._contact.get_own_public_key,
-                subtensor=self.subtensor,
-                netuid=netuid,
-                hotkey=wallet.hotkey.ss58_address,
-            ),
-            upload_public_key=partial(
-                self._contact.upload_public_key,
-                subtensor=self.subtensor,
-                wallet=wallet,
-                netuid=netuid,
-            ),
             certificate=self._shield_client.certificate,
             disabled=self.options.disable_uploading_certificate,
         )
@@ -87,21 +74,15 @@ class ShieldMetagraph(Metagraph):
     def sync(self, block: int | None = None, lite: bool | None = None, subtensor=None):
         if subtensor is not None and subtensor is not self.subtensor:
             self.subtensor = subtensor
-            self._certificate_reconciler.get_own_public_key = partial(
-                self._contact.get_own_public_key,
-                subtensor=self.subtensor,
-                netuid=self.netuid,
-                hotkey=self.wallet.hotkey.ss58_address,
-            )
-            self._certificate_reconciler.upload_public_key = partial(
-                self._contact.upload_public_key,
-                subtensor=self.subtensor,
-                wallet=self.wallet,
-                netuid=self.netuid,
-            )
         self._contact.sync_metagraph(self, subtensor=self.subtensor, block=block, lite=lite)
         run_async_in_thread(
-            self._certificate_reconciler.ensure_own_certificate_matches(),
+            self._certificate_reconciler.ensure_own_certificate_matches(
+                contact=self._contact,
+                client=self.subtensor,
+                netuid=self.netuid,
+                hotkey=self.wallet.hotkey.ss58_address,
+                wallet=self.wallet,
+            ),
             executor=self._async_executor,
         )
         own_hotkey = self.wallet.hotkey.ss58_address

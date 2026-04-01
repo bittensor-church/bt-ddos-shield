@@ -1,17 +1,24 @@
 from __future__ import annotations
 
+import inspect
 import time
-from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from bt_ddos_shield_client.certificates import Certificate
 from bt_ddos_shield_client.types import PublicKey
 
 
+def _contact_client_kwargs(method, client: object) -> dict[str, object]:
+    parameters = inspect.signature(method).parameters
+    if 'subtensor' in parameters:
+        return {'subtensor': client}
+    if 'bittensor' in parameters:
+        return {'bittensor': client}
+    raise TypeError('contact method must accept either "subtensor" or "bittensor"')
+
+
 @dataclass
 class CertificateReconciler:
-    get_own_public_key: Callable[[], Awaitable[PublicKey | None]]
-    upload_public_key: Callable[[PublicKey, int], Awaitable[None]]
     certificate: Certificate
     disabled: bool = False
     match_ttl_seconds: float = 300.0
@@ -28,17 +35,32 @@ class CertificateReconciler:
         self._matched_public_key = self.certificate.public_key
         self._matched_until = time.monotonic() + self.match_ttl_seconds
 
-    async def ensure_own_certificate_matches(self) -> None:
+    async def ensure_own_certificate_matches(
+        self,
+        *,
+        contact,
+        client,
+        netuid: int,
+        hotkey: str,
+        wallet,
+    ) -> None:
         if self.disabled or self._is_match_cached():
             return
 
-        public_key = await self.get_own_public_key()
+        public_key = await contact.get_own_public_key(
+            netuid=netuid,
+            hotkey=hotkey,
+            **_contact_client_kwargs(contact.get_own_public_key, client),
+        )
         if public_key == self.certificate.public_key:
             self._cache_match()
             return
 
-        await self.upload_public_key(
+        await contact.upload_public_key(
             self.certificate.public_key,
             self.certificate.algorithm,
+            wallet=wallet,
+            netuid=netuid,
+            **_contact_client_kwargs(contact.upload_public_key, client),
         )
         self._cache_match()
