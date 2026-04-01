@@ -107,6 +107,17 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
             certificate_reconciler=certificate_reconciler,
         )
 
+    def clone(self, client: turbobt.Bittensor) -> 'ShieldedSubnetReference':
+        return type(self)(
+            netuid=self.netuid,
+            client=client,
+            wallet=self.wallet,
+            ddos_shield_options=self.ddos_shield_options,
+            contact=self._contact,
+            shield_client=self._shield_client,
+            certificate_reconciler=self._certificate_reconciler,
+        )
+
     async def list_neurons(self, *args, **kwargs) -> list[turbobt.neuron.Neuron]:
         await self._certificate_reconciler.ensure_own_certificate_matches(
             contact=self._contact,
