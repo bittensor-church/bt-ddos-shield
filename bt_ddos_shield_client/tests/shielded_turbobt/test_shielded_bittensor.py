@@ -325,6 +325,28 @@ async def test_shielded_subnet_reference_from_bittensor_works_end_to_end(
     ]
 
 
+def test_shielded_subnet_reference_clone_reuses_helpers_and_swaps_client(tmp_path):
+    original = ShieldedSubnetReference.from_bittensor(
+        _make_bittensor(tmp_path),
+        7,
+        wallet=make_wallet(),
+        ddos_shield_options=ShieldMetagraphOptions(certificate_path=_certificate_path(tmp_path)),
+    )
+    new_client = _make_bittensor(tmp_path, fixture_name='validator_b.pem')
+
+    cloned = original.clone(new_client)
+
+    assert cloned is not original
+    assert cloned.client is new_client
+    assert cloned.client is not original.client
+    assert cloned.netuid == original.netuid
+    assert cloned.wallet is original.wallet
+    assert cloned.ddos_shield_options is original.ddos_shield_options
+    assert cloned._contact is original._contact
+    assert cloned._shield_client is original._shield_client
+    assert cloned._certificate_reconciler is original._certificate_reconciler
+
+
 @pytest.mark.asyncio
 async def test_shielded_bittensor_raises_when_reading_on_chain_cert_fails(
     patched_turbo_bittensor_contact,

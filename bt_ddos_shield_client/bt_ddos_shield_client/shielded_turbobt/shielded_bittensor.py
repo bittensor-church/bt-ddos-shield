@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-from functools import partial
 
 import turbobt
 import turbobt.neuron
@@ -30,18 +29,6 @@ class ShieldedBittensor(turbobt.Bittensor):
             certificate_path=resolve_certificate_path(self.ddos_shield_options.certificate_path),
         )
         self._certificate_reconciler = CertificateReconciler(
-            get_own_public_key=partial(
-                self._contact.get_own_public_key,
-                bittensor=self,
-                netuid=ddos_shield_netuid,
-                hotkey=wallet.hotkey.ss58_address,
-            ),
-            upload_public_key=partial(
-                self._contact.upload_public_key,
-                bittensor=self,
-                netuid=ddos_shield_netuid,
-                wallet=wallet,
-            ),
             certificate=self._shield_client.certificate,
             disabled=self.ddos_shield_options.disable_uploading_certificate,
         )
@@ -94,18 +81,6 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
             certificate_path=resolve_certificate_path(self.ddos_shield_options.certificate_path),
         )
         self._certificate_reconciler = certificate_reconciler or CertificateReconciler(
-            get_own_public_key=partial(
-                self._contact.get_own_public_key,
-                bittensor=client,
-                netuid=self.netuid,
-                hotkey=self.wallet.hotkey.ss58_address,
-            ),
-            upload_public_key=partial(
-                self._contact.upload_public_key,
-                bittensor=client,
-                netuid=self.netuid,
-                wallet=self.wallet,
-            ),
             certificate=self._shield_client.certificate,
             disabled=self.ddos_shield_options.disable_uploading_certificate,
         )
@@ -132,8 +107,25 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
             certificate_reconciler=certificate_reconciler,
         )
 
+    def clone(self, client: turbobt.Bittensor) -> 'ShieldedSubnetReference':
+        return type(self)(
+            netuid=self.netuid,
+            client=client,
+            wallet=self.wallet,
+            ddos_shield_options=self.ddos_shield_options,
+            contact=self._contact,
+            shield_client=self._shield_client,
+            certificate_reconciler=self._certificate_reconciler,
+        )
+
     async def list_neurons(self, *args, **kwargs) -> list[turbobt.neuron.Neuron]:
-        await self._certificate_reconciler.ensure_own_certificate_matches()
+        await self._certificate_reconciler.ensure_own_certificate_matches(
+            contact=self._contact,
+            client=self.client,
+            netuid=self.netuid,
+            hotkey=self.wallet.hotkey.ss58_address,
+            wallet=self.wallet,
+        )
         neurons = await self._contact.list_neurons(
             bittensor=self.client,
             netuid=self.netuid,
