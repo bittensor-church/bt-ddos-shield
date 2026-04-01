@@ -9,6 +9,7 @@ from Crypto.Protocol.KDF import HKDF
 from Crypto.PublicKey.ECC import EccKey
 from Crypto.Signature.eddsa import import_private_key, import_public_key
 
+from server_shield.shared.config import get_config
 from server_shield.shared.state import DesiredDomainEntry, ManifestPayloadState, ManifestState
 
 
@@ -40,10 +41,11 @@ def _encrypt_with_ed25519_ecies(public_key_hex: str, data: bytes) -> bytes:
 
 def build_manifest_state(desired_domains: dict[str, DesiredDomainEntry]) -> ManifestState:
     encrypted_url_mapping: dict[str, str] = {}
+    miner_port = get_config().miner_port
     for hotkey, entry in sorted(desired_domains.items()):
         encrypted_bytes = _encrypt_with_ed25519_ecies(
             entry.public_cert,
-            entry.domain.encode("utf-8"),
+            f"{entry.domain}:{miner_port}".encode("utf-8"),
         )
         encrypted_url_mapping[hotkey] = base64.b64encode(encrypted_bytes).decode("ascii")
 

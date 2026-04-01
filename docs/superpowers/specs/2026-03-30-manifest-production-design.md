@@ -31,13 +31,13 @@ This change does not cover:
 {
     "ddos_shield_manifest": {
         "encrypted_url_mapping": {
-            "<validator-hotkey>": "<base64-encrypted-hostname>"
+            "<validator-hotkey>": "<base64-encrypted-endpoint>"
         }
     }
 }
 ```
 
-- The encrypted plaintext for each validator is the assigned hostname only, not `host:port`.
+- The encrypted plaintext for each validator is the assigned hostname plus miner port, formatted as `{domain}:{port}`.
 - When there are zero eligible validators, `chain_reader` must write exactly:
 
 ```json
@@ -138,7 +138,7 @@ After that reconciliation, it should build `manifest.json` from the resulting de
 For each desired-domain entry:
 
 - key: validator hotkey
-- plaintext value: assigned hostname such as `5Hjbf5s2-abc123def456.example.com`
+- plaintext value: assigned endpoint such as `5Hjbf5s2-abc123def456.example.com:9001`
 - encrypted value: ECIES encryption using the validator public cert
 - stored JSON value: base64-encoded encrypted bytes
 
@@ -227,5 +227,5 @@ Manual verification should cover:
 ## Risks
 
 - The manifest state contract changes materially, so any stale code paths still expecting `manifest_url` or `encrypted_addresses` must be updated in one pass.
-- Encryption compatibility matters: if the local ECIES configuration differs from the old client/server expectation, validators will not be able to decrypt their assigned hostnames.
+- Encryption compatibility matters: if the local ECIES configuration differs from the old client/server expectation, validators will not be able to decrypt their assigned endpoints.
 - Deterministic JSON formatting reduces diff churn but means every state write path must use the shared stable serializer consistently.

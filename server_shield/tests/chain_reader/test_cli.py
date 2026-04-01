@@ -3,7 +3,12 @@ import json
 from pathlib import Path
 import re
 
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto.Protocol.KDF import HKDF
 from Crypto.PublicKey import ECC
+from Crypto.PublicKey.ECC import EccKey
+from Crypto.Signature.eddsa import import_private_key, import_public_key
 
 from server_shield.chain_reader.cli import main
 from server_shield.shared import state_store
@@ -59,6 +64,34 @@ def _set_required_env(monkeypatch) -> None:
 
 def _valid_public_key_hex() -> str:
     return ECC.generate(curve="ed25519").public_key().export_key(format="raw").hex()
+
+
+def _private_and_public_key_hex() -> tuple[str, str]:
+    key = ECC.generate(curve="ed25519")
+    return key.seed.hex(), key.public_key().export_key(format="raw").hex()
+
+
+def _shared_point(secret: bytes, public_key: bytes) -> bytes:
+    shared_point = import_public_key(public_key).pointQ * import_private_key(secret).d
+    return EccKey(curve="ed25519", point=shared_point).export_key(format="raw")
+
+
+def _decrypt_manifest_value(private_key_hex: str, encoded_value: str) -> str:
+    payload = base64.b64decode(encoded_value)
+    ephemeral_public_key = payload[:32]
+    nonce = payload[32:48]
+    tag = payload[48:64]
+    ciphertext = payload[64:]
+    private_key = bytes.fromhex(private_key_hex)
+    symmetric_key = HKDF(
+        ephemeral_public_key + _shared_point(private_key, ephemeral_public_key),
+        32,
+        b"",
+        SHA256,
+        num_keys=1,
+    )
+    cipher = AES.new(symmetric_key, AES.MODE_GCM, nonce)
+    return cipher.decrypt_and_verify(ciphertext, tag).decode("utf-8")
 
 
 class MatchesRegex:
@@ -122,11 +155,11 @@ def test_chain_reader_main_reconciles_domains_from_contact(
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
     _set_required_env(monkeypatch)
     write_root_domain(tmp_path, "shield.example.com")
-    existing_cert = _valid_public_key_hex()
-    new_cert = _valid_public_key_hex()
-    cert_rotated_cert = _valid_public_key_hex()
-    root_rotated_cert = _valid_public_key_hex()
-    blacklisted_cert = _valid_public_key_hex()
+    existing_private_key, existing_cert = _private_and_public_key_hex()
+    new_private_key, new_cert = _private_and_public_key_hex()
+    cert_rotated_private_key, cert_rotated_cert = _private_and_public_key_hex()
+    root_rotated_private_key, root_rotated_cert = _private_and_public_key_hex()
+    _, blacklisted_cert = _private_and_public_key_hex()
     write_desired_domains(
         tmp_path,
         {
@@ -210,10 +243,22 @@ def test_chain_reader_main_reconciles_domains_from_contact(
         "new-validator",
         "root-rotated-validator",
     }
-    assert all(
-        base64.b64decode(value)
-        for value in manifest.ddos_shield_manifest.encrypted_url_mapping.values()
-    )
+    assert _decrypt_manifest_value(
+        cert_rotated_private_key,
+        manifest.ddos_shield_manifest.encrypted_url_mapping["cert-rotated-validator"],
+    ) == f'{desired_domains_json["domains"]["cert-rotated-validator"]["domain"]}:9001'
+    assert _decrypt_manifest_value(
+        existing_private_key,
+        manifest.ddos_shield_manifest.encrypted_url_mapping["existing-validator"],
+    ) == "existing-validator.shield.example.com:9001"
+    assert _decrypt_manifest_value(
+        new_private_key,
+        manifest.ddos_shield_manifest.encrypted_url_mapping["new-validator"],
+    ) == f'{desired_domains_json["domains"]["new-validator"]["domain"]}:9001'
+    assert _decrypt_manifest_value(
+        root_rotated_private_key,
+        manifest.ddos_shield_manifest.encrypted_url_mapping["root-rotated-validator"],
+    ) == f'{desired_domains_json["domains"]["root-rotated-validator"]["domain"]}:9001'
     assert [call.method for call in patched_subtensor_contact.calls] == ["list_validator_certificates"]
     assert "excluding blacklisted validator blacklisted-validator" in captured.out
     assert "excluding validator missing-cert-validator: missing certificate" in captured.out
@@ -253,7 +298,7 @@ def test_chain_reader_main_keeps_valid_results_when_one_certificate_payload_is_m
     monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", tmp_path)
     _set_required_env(monkeypatch)
     write_root_domain(tmp_path, "shield.example.com")
-    good_cert = _valid_public_key_hex()
+    good_private_key, good_cert = _private_and_public_key_hex()
     patched_subtensor_contact.set_validator_certificates(
         [
             ValidatorCertificateRecord(
@@ -281,6 +326,10 @@ def test_chain_reader_main_keeps_valid_results_when_one_certificate_payload_is_m
         }
     }
     assert set(manifest.ddos_shield_manifest.encrypted_url_mapping) == {"good-validator"}
+    assert _decrypt_manifest_value(
+        good_private_key,
+        manifest.ddos_shield_manifest.encrypted_url_mapping["good-validator"],
+    ) == f'{_read_json(tmp_path / "desired_domains.json")["domains"]["good-validator"]["domain"]}:9001'
     assert "excluding validator malformed-validator: malformed certificate payload" in captured.out
     assert "invalid_cert=1" in captured.out
     assert "observed=2" in captured.out
