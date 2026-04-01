@@ -122,7 +122,7 @@ def contact() -> AbstractContact:
 - Those tests must exercise only public adapter methods.
 - Those tests may be heavy integration tests.
 - Those tests should be opt-in locally and expected in CI.
-- When practical, those tests should create their own disposable external-service environment.
+- When practical, those tests should create their own disposable external-service environment. Follow the setup rules below rather than relying on accidental fixture state.
 - Those tests must not depend on unrelated manual-test directories for runtime dependencies.
 
 ### Forbidden
@@ -131,6 +131,39 @@ def contact() -> AbstractContact:
 - Do not treat mock-contact coverage as a substitute for real adapter integration coverage.
 - Do not test private adapter helpers in place of real adapter behavior.
 - Do not hide real adapter tests inside unrelated wrapper test modules.
+
+## Real Integration Environment Setup Rules
+
+### Required
+
+- Shape real integration fixtures around explicit domain roles, not around misleading names or incidental chain state.
+- Prefer fixtures that make roles concrete and inspectable, for example:
+  - validator A
+  - validator B
+  - registered non-validator
+  - owner or subnet bootstrap actor
+- Use real artifacts in those environments when practical, including real certificates, keys, wallets, and realistic payloads.
+- Assert the intended environment topology during setup against the real service state, not against assumptions. Examples include:
+  - which actors are registered
+  - which actors have validator permits
+  - which actors have stake
+  - which actors have no published external record yet
+- In collection-oriented real adapter tests, prefer composite scenarios that exercise multiple states in sequence or in one case, including mixed healthy and problematic records.
+- When testing collection reads, make expected outputs include unaffected valid records as well as problematic records so the test proves partial failure does not poison the whole result.
+- Include concrete assertions for actual returned values, not only presence checks.
+- Dump returned objects to stable dict or list-of-dicts forms when that makes the full behavior easier to assert in one comparison.
+- If a stateful real environment causes transaction collisions, nonce reuse, or other cross-test interference, isolate the affected test in its own disposable environment instead of weakening assertions.
+- If the real service has constraints that make one mixed-state transition impossible in-place, use a second fresh real environment inside the same test or test module rather than replacing the scenario with mocks.
+
+### Forbidden
+
+- Do not rely on fixture names like `miner`, `validator`, or `owner` unless the setup proves those roles through actual external state.
+- Do not assume a registered actor is or is not a validator without asserting the real permit or equivalent service-side role bit.
+- Do not use semantically misleading fixtures to stand in for a role they do not actually have.
+- Do not overfit integration tests to happy-path topologies.
+- Do not assert only that a record exists when the actual returned payload can be asserted concretely.
+- Do not silently ignore extra actors returned by the real service; either account for them explicitly in assertions or reshape the fixture so the topology is unambiguous.
+- Do not keep reusing a shared real environment for stateful write tests once it is clear that prior writes interfere with later assertions.
 
 ## Stateful Infrastructure Exception
 
@@ -155,6 +188,7 @@ def contact() -> AbstractContact:
 - HTTP-backed behavior is exercised with realistic stubs and real cryptographic material when practical.
 - Mock contacts are reconfigured mid-test to simulate on-chain state changes.
 - Real contact implementations have dedicated integration tests in their own test modules.
+- Real integration fixtures prove their role topology against actual service state before the assertions that depend on it.
 
 ### Bad
 
@@ -163,6 +197,8 @@ def contact() -> AbstractContact:
 - Tests cover only fully happy-path contact data and never exercise mixed success/failure collection results.
 - Tests assert internal helper return types instead of public behavior.
 - Tests use placeholder objects when realistic domain objects are easy to build.
+- Tests call something a validator or non-validator without proving that role from the real environment.
+- Tests depend on shared real-environment write state even after collisions or interference are visible.
 
 ## Review Checklist
 
@@ -177,5 +213,6 @@ Before merging, check all of the following:
 - Public tests do not patch internal helper functions below the chosen public seam.
 - Mock-contact tests cover unhappy paths and mixed-result collection scenarios, not only pure happy paths.
 - Real adapter integration tests exist in dedicated files for every real external-service adapter.
+- Real integration test fixtures prove their intended actor roles and state against the actual external service.
 - No test exists only to validate an internal helper's trivial return shape.
 - Databases and similar stateful systems are tested with real instances unless there is a strong reason not to.
