@@ -52,11 +52,11 @@ async def test_shielded_bittensor_uploads_when_on_chain_cert_is_missing(
         await bittensor.subnet(7).list_neurons()
 
     assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
+        'list_neurons',
         'get_own_public_key',
         'upload_public_key',
-        'list_neurons',
     ]
-    assert patched_turbo_bittensor_contact.calls[1].public_key == certificate.public_key
+    assert patched_turbo_bittensor_contact.calls[2].public_key == certificate.public_key
 
 
 @freeze_time('2026-03-31 12:00:00')
@@ -77,11 +77,11 @@ async def test_shielded_bittensor_uploads_when_on_chain_cert_mismatches(
         await bittensor.subnet(7).list_neurons()
 
     assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
+        'list_neurons',
         'get_own_public_key',
         'upload_public_key',
-        'list_neurons',
     ]
-    assert patched_turbo_bittensor_contact.calls[1].public_key == local_certificate.public_key
+    assert patched_turbo_bittensor_contact.calls[2].public_key == local_certificate.public_key
 
 
 @freeze_time('2026-03-31 12:00:00')
@@ -102,8 +102,8 @@ async def test_shielded_bittensor_skips_upload_when_on_chain_cert_matches(
         await bittensor.subnet(7).list_neurons()
 
     assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
-        'get_own_public_key',
         'list_neurons',
+        'get_own_public_key',
     ]
 
 
@@ -126,9 +126,9 @@ async def test_shielded_bittensor_uses_mutated_mock_state_after_ttl(
             await bittensor.subnet(7).list_neurons()
 
         assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
+            'list_neurons',
             'get_own_public_key',
             'upload_public_key',
-            'list_neurons',
         ]
 
         patched_turbo_bittensor_contact.reset_calls()
@@ -139,8 +139,8 @@ async def test_shielded_bittensor_uses_mutated_mock_state_after_ttl(
             await bittensor.subnet(7).list_neurons()
 
     assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
-        'get_own_public_key',
         'list_neurons',
+        'get_own_public_key',
     ]
 
 
@@ -195,8 +195,8 @@ async def test_shielded_bittensor_rechecks_chain_after_ttl_expires(
             await bittensor.subnet(7).list_neurons()
 
     assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
-        'get_own_public_key',
         'list_neurons',
+        'get_own_public_key',
     ]
 
 
@@ -343,6 +343,7 @@ def test_shielded_subnet_reference_clone_reuses_helpers_and_swaps_client(tmp_pat
     assert cloned.wallet is original.wallet
     assert cloned.ddos_shield_options is original.ddos_shield_options
     assert cloned._contact is original._contact
+    assert cloned._neuron_mutator is original._neuron_mutator
     assert cloned._shield_client is original._shield_client
     assert cloned._certificate_reconciler is original._certificate_reconciler
 
@@ -363,7 +364,10 @@ async def test_shielded_bittensor_raises_when_reading_on_chain_cert_fails(
         with pytest.raises(RuntimeError, match='read failed'):
             await bittensor.subnet(7).list_neurons()
 
-    assert [call.method for call in patched_turbo_bittensor_contact.calls] == ['get_own_public_key']
+    assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
+        'list_neurons',
+        'get_own_public_key',
+    ]
 
 
 @pytest.mark.asyncio
@@ -384,6 +388,7 @@ async def test_shielded_bittensor_raises_when_uploading_cert_fails(
             await bittensor.subnet(7).list_neurons()
 
     assert [call.method for call in patched_turbo_bittensor_contact.calls] == [
+        'list_neurons',
         'get_own_public_key',
         'upload_public_key',
     ]

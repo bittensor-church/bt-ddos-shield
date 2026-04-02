@@ -7,9 +7,9 @@ import turbobt.neuron
 
 from bt_ddos_shield_client.certificate_reconciliation import CertificateReconciler
 from bt_ddos_shield_client.client import ShieldClient
-from bt_ddos_shield_client.internal import parse_shield_address
 from bt_ddos_shield_client.shield_metagraph import ShieldMetagraphOptions, resolve_certificate_path
 from bt_ddos_shield_client.shielded_turbobt.contacts import turbo_bittensor_subtensor_contact
+from bt_ddos_shield_client.shielded_turbobt.neuron_mutator import ShieldedNeuronMutator
 
 
 class ShieldedBittensor(turbobt.Bittensor):
@@ -32,6 +32,14 @@ class ShieldedBittensor(turbobt.Bittensor):
             certificate=self._shield_client.certificate,
             disabled=self.ddos_shield_options.disable_uploading_certificate,
         )
+        self._neuron_mutator = ShieldedNeuronMutator(
+            wallet=self.wallet,
+            netuid=self.ddos_shield_netuid,
+            ddos_shield_options=self.ddos_shield_options,
+            contact=self._contact,
+            shield_client=self._shield_client,
+            certificate_reconciler=self._certificate_reconciler,
+        )
 
     async def __aenter__(self):
         await super().__aenter__()
@@ -50,6 +58,7 @@ class ShieldedBittensor(turbobt.Bittensor):
                 contact=self._contact,
                 shield_client=self._shield_client,
                 certificate_reconciler=self._certificate_reconciler,
+                neuron_mutator=self._neuron_mutator,
             )
         return super().subnet(netuid)
 
@@ -62,6 +71,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
     contact: dataclasses.InitVar[object | None] = None
     shield_client: dataclasses.InitVar[ShieldClient | None] = None
     certificate_reconciler: dataclasses.InitVar[CertificateReconciler | None] = None
+    neuron_mutator: dataclasses.InitVar[ShieldedNeuronMutator | None] = None
 
     def __post_init__(
         self,
@@ -71,6 +81,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
         contact=None,
         shield_client=None,
         certificate_reconciler=None,
+        neuron_mutator=None,
     ):
         super().__post_init__(client)
         self.client = client
@@ -84,6 +95,14 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
             certificate=self._shield_client.certificate,
             disabled=self.ddos_shield_options.disable_uploading_certificate,
         )
+        self._neuron_mutator = neuron_mutator or ShieldedNeuronMutator(
+            wallet=self.wallet,
+            netuid=self.netuid,
+            ddos_shield_options=self.ddos_shield_options,
+            contact=self._contact,
+            shield_client=self._shield_client,
+            certificate_reconciler=self._certificate_reconciler,
+        )
 
     @classmethod
     def from_bittensor(
@@ -96,6 +115,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
         contact=None,
         shield_client: ShieldClient | None = None,
         certificate_reconciler: CertificateReconciler | None = None,
+        neuron_mutator: ShieldedNeuronMutator | None = None,
     ) -> 'ShieldedSubnetReference':
         return cls(
             netuid=netuid,
@@ -105,6 +125,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
             contact=contact,
             shield_client=shield_client,
             certificate_reconciler=certificate_reconciler,
+            neuron_mutator=neuron_mutator,
         )
 
     def clone(self, client: turbobt.Bittensor) -> 'ShieldedSubnetReference':
@@ -116,36 +137,14 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
             contact=self._contact,
             shield_client=self._shield_client,
             certificate_reconciler=self._certificate_reconciler,
+            neuron_mutator=self._neuron_mutator,
         )
 
     async def list_neurons(self, *args, **kwargs) -> list[turbobt.neuron.Neuron]:
-        await self._certificate_reconciler.ensure_own_certificate_matches(
-            contact=self._contact,
-            client=self.client,
-            netuid=self.netuid,
-            hotkey=self.wallet.hotkey.ss58_address,
-            wallet=self.wallet,
-        )
         neurons = await self._contact.list_neurons(
             bittensor=self.client,
             netuid=self.netuid,
             *args,
             **kwargs,
         )
-        validator_hotkey = self.wallet.hotkey.ss58_address
-        shield_addresses = await self._shield_client.resolve_shield_addresses(
-            validator_hotkey,
-            [
-                (neuron.hotkey, str(neuron.axon_info.ip), neuron.axon_info.port)
-                for neuron in neurons
-            ],
-        )
-        for neuron, shield_address in zip(neurons, shield_addresses, strict=False):
-            if shield_address is None:
-                continue
-            parsed_address = parse_shield_address(shield_address)
-            if parsed_address is None:
-                continue
-            neuron.axon_info.ip = parsed_address[0]
-            neuron.axon_info.port = parsed_address[1]
-        return neurons
+        return await self._neuron_mutator.mutate_neurons(self.client, neurons)

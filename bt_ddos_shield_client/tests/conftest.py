@@ -23,4 +23,8 @@ def patched_turbo_bittensor_contact(monkeypatch) -> MockTurboBittensorSubtensorC
         'bt_ddos_shield_client.shielded_turbobt.shielded_bittensor.turbo_bittensor_subtensor_contact',
         lambda: contact,
     )
+    monkeypatch.setattr(
+        'bt_ddos_shield_client.shielded_turbobt.neuron_mutator.turbo_bittensor_subtensor_contact',
+        lambda: contact,
+    )
     return contact

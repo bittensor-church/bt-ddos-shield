@@ -6,10 +6,12 @@ Standalone validator-side client package for BT DDoS Shield.
 
 - `bt_ddos_shield_client.ShieldMetagraph`
 - `bt_ddos_shield_client.shielded_turbobt.ShieldedBittensor`
+- `bt_ddos_shield_client.shielded_turbobt.ShieldedNeuronMutator`
 - `bt_ddos_shield_client.shielded_turbobt.ShieldedSubnetReference`
 - `bt_ddos_shield_client.MockBittensorSubtensorContact`
 - `bt_ddos_shield_client.shielded_turbobt.MockTurboBittensorSubtensorContact`
 - `bt_ddos_shield_client.ShieldMetagraphTestRig`
+- `bt_ddos_shield_client.ShieldedNeuronMutatorTestRig`
 
 ## Behavior
 
@@ -103,4 +105,18 @@ async with ShieldedBittensor(
     ddos_shield_netuid=netuid,
 ) as bittensor:
     neurons = await bittensor.subnet(netuid).list_neurons()
+```
+
+```python
+from bt_ddos_shield_client.shield_metagraph import ShieldMetagraphOptions
+from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
+
+mutator = ShieldedNeuronMutator(
+    wallet=wallet,
+    netuid=netuid,
+    ddos_shield_options=ShieldMetagraphOptions(certificate_path='./validator_cert.pem'),
+)
+
+neurons = await bittensor.subnet(netuid).list_neurons()
+await mutator.mutate_neurons(bittensor, neurons)
 ```

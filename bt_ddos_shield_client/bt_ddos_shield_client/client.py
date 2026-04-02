@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 import os
 
 from bt_ddos_shield_client.certificates import Certificate, EDDSACertificateManager
@@ -73,3 +74,24 @@ class ShieldClient:
                 for miner_hotkey, axon_ip, axon_port in miners
             ]
         )
+
+    async def resolve_shield_addresses_by_hotkey(
+        self,
+        validator_hotkey: Hotkey,
+        miners: Mapping[Hotkey, tuple[str, int]],
+    ) -> dict[Hotkey, ShieldAddress | None]:
+        resolved_addresses = await asyncio.gather(
+            *[
+                self.resolve_shield_address(
+                    validator_hotkey,
+                    miner_hotkey,
+                    axon_ip,
+                    axon_port,
+                )
+                for miner_hotkey, (axon_ip, axon_port) in miners.items()
+            ]
+        )
+        return {
+            miner_hotkey: shield_address
+            for (miner_hotkey, _), shield_address in zip(miners.items(), resolved_addresses, strict=True)
+        }
