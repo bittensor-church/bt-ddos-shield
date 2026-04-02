@@ -324,8 +324,11 @@ provides-extras = ["turbobt"]
 test = [
     { name = "aioresponses", specifier = "~=0.7.8" },
     { name = "bt-ddos-shield-client", extras = ["turbobt"] },
+    { name = "freezegun", specifier = "~=1.5.1" },
+    { name = "paramiko", specifier = "~=3.5" },
     { name = "pytest", specifier = "~=8.3.4" },
     { name = "pytest-asyncio", specifier = "~=1.0.0" },
+    { name = "testcontainers", specifier = "~=4.13.2" },
 ]
 
 [[package]]
