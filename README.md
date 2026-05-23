@@ -7,7 +7,7 @@
 BT DDoS Shield is a solution designed for **Bittensor subnet owners who want to protect miners from Distributed Denial-of-Service (DDoS)** attacks and foster honest competition.
 
 The basic principle behind the shield is to assign multiple addresses to miners - one for each validator - **instead of exposing the miner's public IP in the metagraph**. 
-These addresses are communicated to validators using Knowledge Commitments and encrypted with ECIES 
+These addresses are communicated to validators encrypted with ECIES 
 ([Elliptic Curve Integrated Encryption Scheme](https://github.com/ecies/py)) keys published by the validators. 
 This creates **a secure, permissionless method of distributing miner connection details**.
 
@@ -49,9 +49,6 @@ Contributor and agent standards live in [docs/engineering-standards.md](docs/eng
 ### Disclaimers
 
 * As for now BT DDoS Shield can only be used for hiding AWS EC2 server and uses AWS ELB and WAF to handle communication.
-* As autohiding is not yet implemented, after starting the Shield it is required to manually block the traffic from all sources except the
-Shield's load balancer (ELB created by the Shield during first run). This can be done using any firewall (like UFW) locally on
-server or by configuring security groups in AWS via AWS panel (EC2 instance security groups should allow traffic only from ELB).
 
 ### Prerequisites
 
@@ -96,7 +93,7 @@ to `GET /` request on server's traffic port. Also, server security group should 
 
 ### Miner part internal architecture
 
-The server shield now lives under `server_shield` as one Python project with 3 internal components:
+The server shield lives under `server_shield` as one Python project with 3 internal components:
 
 - `pulumi_runner`: provisions and updates the AWS infrastructure
 - `chain_reader`: reads the validator set and validator certs from chain, then reconciles `desired_domains.json`
@@ -111,14 +108,6 @@ Current state files:
 - `desired_domains.json`: `{ "domains": {} }`
 - `blacklist.json`: `[]`
 - `manifest.json`:
-
-```json
-{
-    "ddos_shield_manifest": {
-        "encrypted_url_mapping": {}
-    }
-}
-```
 
 Behavior notes:
 
@@ -140,11 +129,14 @@ Build the Docker image from the repository root with:
 docker build -f server_shield/Dockerfile -t server-shield:local .
 ```
 
-Pulumi backend configuration is mandatory. Set `SERVER_SHIELD_PULUMI__BACKEND_URL` in your environment.
+Pulumi backend is Pulumi's internal configuration paramter, more or less responsible for determining where Pulumi 
+persists its state. It can be a local file, a cloud object storage url etc. See Pulumi docs for options, this project only
+passes this env var to Pulumi. `SERVER_SHIELD_PULUMI__BACKEND_URL` is mandatory.
 
-If you want `blacklist.json` and the other shared state files to persist across container restarts, set `SERVER_SHIELD_STATE_DIR` to a mounted directory. This is recommended in production. Mount the whole state directory, not just `blacklist.json`, so the operator-managed blacklist and the generated JSON state stay together.
+If you want `blacklist.json` and the other shared state files to persist across container restarts, mount 
+`/var/lib/server-shield/state` when running the server container. This is recommended in production.
 
-Local file backend example:
+Local backend file example:
 
 ```dotenv
 SERVER_SHIELD_PULUMI__BACKEND_URL=file:///var/lib/server-shield/pulumi-state
@@ -155,7 +147,6 @@ SERVER_SHIELD_SUBTENSOR_ADDRESS=ws://...
 SERVER_SHIELD_NETUID=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY=...
-SERVER_SHIELD_STATE_DIR=/var/lib/server-shield/state
 SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID=...
 SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY=...
 SERVER_SHIELD_PULUMI__AWS__AWS_REGION=eu-north-1
@@ -169,7 +160,7 @@ Run the container with a persistent Pulumi state volume:
 docker run \
   --env-file .env \
   --volume server-shield-pulumi-state:/var/lib/server-shield/pulumi-state \
-  --volume server-shield-state:/var/lib/server-shield/state \
+  --volume /opt/bittensor-ddos-shield/state/:/var/lib/server-shield/state \
   server-shield:local
 ```
 
@@ -188,17 +179,7 @@ S3 backend example:
 SERVER_SHIELD_PULUMI__BACKEND_URL=s3://my-pulumi-state-bucket/server-shield
 SERVER_SHIELD_PULUMI__STACK_NAME=server-shield
 SERVER_SHIELD_PULUMI__SHIELD_BACKEND=AWS
-SERVER_SHIELD_MINER_PORT=9001
-SERVER_SHIELD_SUBTENSOR_ADDRESS=ws://...
-SERVER_SHIELD_NETUID=...
-SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME=...
-SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY=...
-SERVER_SHIELD_STATE_DIR=/var/lib/server-shield/state
-SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID=...
-SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY=...
-SERVER_SHIELD_PULUMI__AWS__AWS_REGION=eu-north-1
-SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID=...
-SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID=...
+...
 ```
 
 Run the container against the S3 backend:
@@ -206,7 +187,7 @@ Run the container against the S3 backend:
 ```bash
 docker run \
   --env-file .env \
-  --volume server-shield-state:/var/lib/server-shield/state \
+  --volume /opt/bittensor-ddos-shield/state/:/var/lib/server-shield/state \
   server-shield:local
 ```
 

@@ -15,8 +15,6 @@ Standalone validator-side client package for BT DDoS Shield.
 
 ## Behavior
 
-The client no longer reads manifest URLs from knowledge commitments.
-
 For each miner axon, it:
 
 1. builds `http://{axon_ip}:{axon_port}/shield_manifest.json`
@@ -56,7 +54,7 @@ uv run --project . --python 3.12 --group test pytest tests -v
 The test suite stays at the public boundary:
 
 - tests patch `bittensor_subtensor_contact()` / `turbo_bittensor_subtensor_contact()`
-- production mock contacts drive certificate upload scenarios
+- mock contacts drive certificate upload scenarios
 - `aioresponses` mocks `shield_manifest.json` responses over HTTP
 
 ### Real Contact Integration Tests

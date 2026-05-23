@@ -14,7 +14,8 @@ from server_shield.shared.state import (
 )
 
 
-DEFAULT_STATE_DIR = Path(__file__).resolve().parent / "state_files"
+EXAMPLE_STATE_DIR = Path(__file__).resolve().parent / "state_files"
+DEFAULT_STATE_DIR = Path("/var/lib/server-shield/state")
 STATE_DIR_ENV_VAR = "SERVER_SHIELD_STATE_DIR"
 STATE_FILE_NAMES = (
     "root_domain.json",
@@ -129,7 +130,7 @@ def _resolve_state_dir(state_dir: Path | None) -> Path:
 
 
 def _copy_example_state_file(file_name: str, state_dir: Path) -> None:
-    example_path = DEFAULT_STATE_DIR / file_name.replace(".json", ".example.json")
+    example_path = EXAMPLE_STATE_DIR / file_name.replace(".json", ".example.json")
     if not example_path.exists():
         raise FileNotFoundError(f"Missing state example file: {example_path}")
     shutil.copyfile(example_path, state_dir / file_name)

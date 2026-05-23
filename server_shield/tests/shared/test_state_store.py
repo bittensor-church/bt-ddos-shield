@@ -80,7 +80,7 @@ def test_read_copies_example_file_when_runtime_state_missing(tmp_path: Path, mon
     runtime_dir = tmp_path / "runtime"
     _write_example_files(example_dir)
     (example_dir / "axon_public_ip.example.json").write_text('{"ip": "7.7.7.7"}\n')
-    monkeypatch.setattr(state_store, "DEFAULT_STATE_DIR", example_dir)
+    monkeypatch.setattr(state_store, "EXAMPLE_STATE_DIR", example_dir)
 
     axon_public_ip = read_axon_public_ip(runtime_dir)
 
