@@ -5,11 +5,7 @@ Standalone validator-side client package for BT DDoS Shield.
 ## Public API
 
 - `bt_ddos_shield_client.ShieldMetagraph`
-- `bt_ddos_shield_client.shielded_turbobt.ShieldedBittensor`
 - `bt_ddos_shield_client.shielded_turbobt.ShieldedNeuronMutator`
-- `bt_ddos_shield_client.shielded_turbobt.ShieldedSubnetReference`
-- `bt_ddos_shield_client.MockBittensorSubtensorContact`
-- `bt_ddos_shield_client.shielded_turbobt.MockTurboBittensorSubtensorContact`
 - `bt_ddos_shield_client.ShieldMetagraphTestRig`
 - `bt_ddos_shield_client.ShieldedNeuronMutatorTestRig`
 
