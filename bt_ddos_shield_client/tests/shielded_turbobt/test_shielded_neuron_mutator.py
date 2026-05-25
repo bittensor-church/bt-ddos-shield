@@ -12,7 +12,9 @@ from tests.fixtures import certificate_fixture_path, load_certificate_fixture
 
 pytest.importorskip('turbobt')
 
-from bt_ddos_shield_client.shielded_turbobt import ShieldedBittensor, ShieldedNeuronMutator
+import turbobt
+
+from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
 
 
 def _make_wallet_with_certificate(tmp_path, fixture_name: str = 'validator_a.pem'):
@@ -23,11 +25,10 @@ def _make_wallet_with_certificate(tmp_path, fixture_name: str = 'validator_a.pem
     return make_wallet(hotkey_path=hotkey_path)
 
 
-def _make_bittensor(tmp_path, fixture_name: str = 'validator_a.pem') -> ShieldedBittensor:
-    return ShieldedBittensor(
+def _make_bittensor(tmp_path, fixture_name: str = 'validator_a.pem') -> turbobt.Bittensor:
+    return turbobt.Bittensor(
         'test',
         wallet=_make_wallet_with_certificate(tmp_path, fixture_name),
-        ddos_shield_netuid=7,
     )
 
 

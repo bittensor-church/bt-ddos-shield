@@ -6,14 +6,13 @@ import pathlib
 import os
 
 from bt_ddos_shield_client import ShieldMetagraph
+from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
+from turbobt import Bittensor
 
 
 from bittensor_wallet import bittensor_wallet
 from dotenv import load_dotenv
 
-
-# from bt_ddos_shield.turbobt import ShieldedBittensor
-# from turbobt import Bittensor
 
 load_dotenv(pathlib.Path(__file__).parent / '.env')
 
@@ -40,16 +39,15 @@ miner_wallet = bittensor_wallet.Wallet(
 #     print(neuron.hotkey, neuron.axon_info.ip, neuron.axon_info.port)
 
 
-from bt_ddos_shield_client.shielded_turbobt import ShieldedBittensor
-
 async def main():
-    async with ShieldedBittensor(
+    async with Bittensor(
         os.environ['SERVER_SHIELD_SUBTENSOR_ADDRESS'],
         wallet=bittensor_wallet.Wallet(os.environ['BITTENSOR_VALIDATOR_WALLET_NAME'], os.environ['BITTENSOR_VALIDATOR_WALLET_HOTKEY']),
-        ddos_shield_netuid=int(os.environ['SERVER_SHIELD_NETUID']),
     ) as bittensor:
-        sn = bittensor.subnet(int(os.environ['SERVER_SHIELD_NETUID']))
-        for neuron in await sn.list_neurons():
+        netuid = int(os.environ['SERVER_SHIELD_NETUID'])
+        mutator = ShieldedNeuronMutator(wallet=bittensor.wallet, netuid=netuid)
+        sn = bittensor.subnet(netuid)
+        for neuron in await mutator.mutate_neurons(bittensor, await sn.list_neurons()):
             print(neuron.hotkey, neuron.axon_info.ip, neuron.axon_info.port)
 
 

@@ -7,7 +7,6 @@ from bittensor_wallet import bittensor_wallet
 from dotenv import load_dotenv
 
 
-# from bt_ddos_shield.turbobt import ShieldedBittensor
 # from turbobt import Bittensor
 
 load_dotenv(pathlib.Path(__file__).parent / '.env')
@@ -39,11 +38,7 @@ async def main():
     #     sn = plain_bittensor.subnet(os.environ['BITTENSOR_NETUID'])
     #     unshielded_addres_dict = {n.hotkey: n.axon_info.ip for n in await sn.list_neurons()}
     #     print(unshielded_addres_dict)
-    # async with ShieldedBittensor(
-    #         os.environ['BITTENSOR_NETWORK'],
-    #         ddos_shield_netuid=2,
-    #         wallet=vali_wallet,
-    # ) as bittensor:
+    # async with Bittensor(os.environ['BITTENSOR_NETWORK'], wallet=vali_wallet) as bittensor:
     #     sn = bittensor.subnet(2)
     #     for neuron in await sn.list_neurons():
     #         print(

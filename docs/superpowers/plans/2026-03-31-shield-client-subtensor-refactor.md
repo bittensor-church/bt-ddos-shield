@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Refactor `bt_ddos_shield_client` so `ShieldClient` is a pure local certificate + manifest helper, all bittensor/turbobt I/O flows through contact adapters, certificate reconciliation lives in a separate TTL-backed layer, and both `ShieldMetagraph` and `ShieldedSubnetReference` stop relying on `super()` for chain transport.
+**Goal:** Refactor `bt_ddos_shield_client` so `ShieldClient` is a pure local certificate + manifest helper, all bittensor/turbobt I/O flows through contact adapters, certificate reconciliation lives in a separate TTL-backed layer, and both `ShieldMetagraph` and `LegacySubnetReference` stop relying on `super()` for chain transport.
 
-**Architecture:** Introduce a dedicated contact module that becomes the only adapter surface for bittensor/turbobt communication, plus a separate `CertificateReconciler` that owns “does on-chain cert match local cert?” TTL state. `ShieldMetagraph` should delegate to a contact that invokes the upstream `Metagraph.sync(...)` implementation on the passed metagraph instance, while `ShieldedSubnetReference` should delegate to a contact that invokes the upstream `SubnetReference.list_neurons(...)` implementation on a wrapped base subnet reference.
+**Architecture:** Introduce a dedicated contact module that becomes the only adapter surface for bittensor/turbobt communication, plus a separate `CertificateReconciler` that owns “does on-chain cert match local cert?” TTL state. `ShieldMetagraph` should delegate to a contact that invokes the upstream `Metagraph.sync(...)` implementation on the passed metagraph instance, while `LegacySubnetReference` should delegate to a contact that invokes the upstream `SubnetReference.list_neurons(...)` implementation on a wrapped base subnet reference.
 
 **Tech Stack:** Python 3.11+, `bittensor~=9.0`, `turbobt~=0.3.1`, `concurrent.futures.ThreadPoolExecutor`, existing certificate / manifest helpers in `bt_ddos_shield_client`
 
@@ -24,10 +24,10 @@
   - Replace inline contact classes and `super().sync(...)` transport usage.
   - Build `ShieldClient`, contact, reconciler, and reusable executor.
   - Delegate base metagraph sync through the contact, then apply shield-address rewriting.
-- Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
+- Modify: `legacy_turbobt_wrapper.py`
   - Replace inline contact class and `super().list_neurons(...)` transport usage.
   - Use `CertificateReconciler`.
-  - Add `ShieldedSubnetReference.from_bittensor(...)`.
+  - Add `LegacySubnetReference.from_bittensor(...)`.
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/internal.py`
   - Let `run_async_in_thread` use a caller-supplied executor.
 
@@ -44,7 +44,7 @@
 **Files:**
 - Create: `bt_ddos_shield_client/bt_ddos_shield_client/contacts.py`
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py`
-- Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
+- Modify: `legacy_turbobt_wrapper.py`
 
 - [ ] **Step 1: Create the shared contact protocol surface**
 
@@ -207,7 +207,7 @@ class TurboBittensorSubtensorContact:
 
 - [ ] **Step 4: Switch existing modules to import contacts from the new module**
 
-Replace inline contact declarations in `shield_metagraph.py` and `shielded_turbobt/shielded_bittensor.py` with imports from `contacts.py`:
+Replace inline contact declarations in `shield_metagraph.py` and `legacy_turbobt_wrapper.py` with imports from `contacts.py`:
 
 ```python
 from bt_ddos_shield_client.contacts import (
@@ -229,7 +229,7 @@ Expected: `Compiling 'bt_ddos_shield_client/bt_ddos_shield_client/contacts.py'..
 ```bash
 git add bt_ddos_shield_client/bt_ddos_shield_client/contacts.py \
         bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py \
-        bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py
+        legacy_turbobt_wrapper.py
 git commit -m "refactor: add shield contact adapters"
 ```
 
@@ -239,7 +239,7 @@ git commit -m "refactor: add shield contact adapters"
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/client.py`
 - Create: `bt_ddos_shield_client/bt_ddos_shield_client/certificate_reconciliation.py`
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py`
-- Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
+- Modify: `legacy_turbobt_wrapper.py`
 
 - [ ] **Step 1: Remove chain and context-manager behavior from ShieldClient**
 
@@ -352,7 +352,7 @@ class CertificateReconciler:
 
 - [ ] **Step 3: Wire the reconciler into the two call sites**
 
-Update `shield_metagraph.py` and `shielded_turbobt/shielded_bittensor.py` to construct:
+Update `shield_metagraph.py` and `legacy_turbobt_wrapper.py` to construct:
 
 ```python
 self._shield_client = ShieldClient(
@@ -383,7 +383,7 @@ Compiling 'bt_ddos_shield_client/bt_ddos_shield_client/certificate_reconciliatio
 git add bt_ddos_shield_client/bt_ddos_shield_client/client.py \
         bt_ddos_shield_client/bt_ddos_shield_client/certificate_reconciliation.py \
         bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py \
-        bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py
+        legacy_turbobt_wrapper.py
 git commit -m "refactor: split shield client from certificate reconciliation"
 ```
 
@@ -532,15 +532,15 @@ git commit -m "refactor: move shield metagraph sync behind contacts"
 ### Task 4: Refactor shielded turbobt and expose `from_bittensor`
 
 **Files:**
-- Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
+- Modify: `legacy_turbobt_wrapper.py`
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/__init__.py`
 
-- [ ] **Step 1: Remove ShieldClient context-manager usage from ShieldedBittensor**
+- [ ] **Step 1: Remove ShieldClient context-manager usage from LegacyTurbobtWrapper**
 
-Update the constructor and async lifecycle in `shielded_bittensor.py`:
+Update the constructor and async lifecycle in `legacy_turbobt_wrapper.py`:
 
 ```python
-class ShieldedBittensor(turbobt.Bittensor):
+class LegacyTurbobtWrapper(turbobt.Bittensor):
     def __init__(
         self,
         *args,
@@ -573,13 +573,13 @@ class ShieldedBittensor(turbobt.Bittensor):
         await super().__aexit__(*args, **kwargs)
 ```
 
-- [ ] **Step 2: Add a reusable public constructor on ShieldedSubnetReference**
+- [ ] **Step 2: Add a reusable public constructor on LegacySubnetReference**
 
-Add the classmethod in `shielded_bittensor.py`:
+Add the classmethod in `legacy_turbobt_wrapper.py`:
 
 ```python
 @dataclasses.dataclass
-class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
+class LegacySubnetReference(turbobt.subnet.SubnetReference):
     client: dataclasses.InitVar[turbobt.Bittensor]
     wallet: dataclasses.InitVar[object | None] = None
     ddos_shield_options: dataclasses.InitVar[ShieldMetagraphOptions | None] = None
@@ -609,7 +609,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
         *,
         wallet=None,
         ddos_shield_options: ShieldMetagraphOptions | None = None,
-    ) -> "ShieldedSubnetReference":
+    ) -> "LegacySubnetReference":
         return cls(
             netuid=netuid,
             client=bittensor,
@@ -620,7 +620,7 @@ class ShieldedSubnetReference(turbobt.subnet.SubnetReference):
 
 - [ ] **Step 3: Replace `super().list_neurons(...)` with the contact adapter**
 
-Rewrite the listing path in `shielded_bittensor.py`:
+Rewrite the listing path in `legacy_turbobt_wrapper.py`:
 
 ```python
     async def list_neurons(self, block_hash: str | None = None) -> list[turbobt.neuron.Neuron]:
@@ -644,14 +644,14 @@ Rewrite the listing path in `shielded_bittensor.py`:
         return neurons
 ```
 
-- [ ] **Step 4: Keep ShieldedBittensor.subnet() routing through the new classmethod**
+- [ ] **Step 4: Keep LegacyTurbobtWrapper.subnet() routing through the new classmethod**
 
-Update the routing logic in `shielded_bittensor.py`:
+Update the routing logic in `legacy_turbobt_wrapper.py`:
 
 ```python
     def subnet(self, netuid: int) -> turbobt.subnet.SubnetReference:
         if netuid == self.ddos_shield_netuid:
-            return ShieldedSubnetReference.from_bittensor(
+            return LegacySubnetReference.from_bittensor(
                 self,
                 netuid,
                 wallet=self.wallet,
@@ -660,18 +660,18 @@ Update the routing logic in `shielded_bittensor.py`:
         return super().subnet(netuid)
 ```
 
-Keep `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/__init__.py` exporting `ShieldedSubnetReference`.
+Keep `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/__init__.py` exporting `LegacySubnetReference`.
 
 - [ ] **Step 5: Run a syntax smoke check for the turbobt refactor**
 
-Run: `uv run --project bt_ddos_shield_client python3 -m compileall bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
+Run: `uv run --project bt_ddos_shield_client python3 -m compileall legacy_turbobt_wrapper.py`
 
-Expected: `Compiling 'bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py'...`
+Expected: `Compiling 'legacy_turbobt_wrapper.py'...`
 
 - [ ] **Step 6: Commit the turbobt rewrite**
 
 ```bash
-git add bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py \
+git add legacy_turbobt_wrapper.py \
         bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/__init__.py
 git commit -m "refactor: route shielded turbobt through contacts"
 ```
@@ -680,7 +680,7 @@ git commit -m "refactor: route shielded turbobt through contacts"
 
 **Files:**
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py`
-- Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
+- Modify: `legacy_turbobt_wrapper.py`
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/contacts.py`
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/certificate_reconciliation.py`
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/client.py`
@@ -718,7 +718,7 @@ git diff -- bt_ddos_shield_client/bt_ddos_shield_client/client.py \
            bt_ddos_shield_client/bt_ddos_shield_client/certificate_reconciliation.py \
            bt_ddos_shield_client/bt_ddos_shield_client/internal.py \
            bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py \
-           bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py
+           legacy_turbobt_wrapper.py
 ```
 
 Confirm all of the following before stopping:
@@ -738,6 +738,6 @@ git add bt_ddos_shield_client/bt_ddos_shield_client/client.py \
         bt_ddos_shield_client/bt_ddos_shield_client/certificate_reconciliation.py \
         bt_ddos_shield_client/bt_ddos_shield_client/internal.py \
         bt_ddos_shield_client/bt_ddos_shield_client/shield_metagraph.py \
-        bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py
+        legacy_turbobt_wrapper.py
 git commit -m "refactor: finalize shield contact and reconciliation split"
 ```

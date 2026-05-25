@@ -2,13 +2,13 @@
 
 ## Goal
 
-Add a public `ShieldedSubnetReference.clone(client)` constructor-style method that returns a new subnet reference with the same configuration and helper objects as the original instance, except for a different `client`.
+Add a public `LegacySubnetReference.clone(client)` constructor-style method that returns a new subnet reference with the same configuration and helper objects as the original instance, except for a different `client`.
 
 Make that safe by refactoring `CertificateReconciler` so it no longer captures transport callables that indirectly bind a specific client or subtensor instance.
 
 ## Current Problem
 
-`ShieldedSubnetReference` currently stores a `CertificateReconciler` built from `partial(...)` callables. Those callables capture the original client at construction time. A cloned subnet reference would therefore expose a new `client` attribute while reconciliation still talks to the old client.
+`LegacySubnetReference` currently stores a `CertificateReconciler` built from `partial(...)` callables. Those callables capture the original client at construction time. A cloned subnet reference would therefore expose a new `client` attribute while reconciliation still talks to the old client.
 
 `ShieldMetagraph` has the same design smell. It constructs a reconciler from bound callables and later mutates the reconciler if `sync(...)` receives a different `subtensor`.
 
@@ -26,7 +26,7 @@ Move transport-specific work into `ensure_own_certificate_matches(...)`, which w
 ensure_own_certificate_matches(*, contact, client, netuid: int, hotkey: str, wallet)
 ```
 
-The `client` parameter is intentionally generic. In `ShieldMetagraph` it will be the current `Subtensor` instance. In `ShieldedSubnetReference` it will be the current `turbobt.Bittensor` instance.
+The `client` parameter is intentionally generic. In `ShieldMetagraph` it will be the current `Subtensor` instance. In `LegacySubnetReference` it will be the current `turbobt.Bittensor` instance.
 
 This keeps the contact interfaces unchanged while removing constructor-time binding of transport state.
 
@@ -74,7 +74,7 @@ self._certificate_reconciler.ensure_own_certificate_matches(
 
 Delete the current logic that mutates reconciler callables when `subtensor` changes. The reconciler will no longer store transport references.
 
-### ShieldedSubnetReference
+### LegacySubnetReference
 
 Construct `CertificateReconciler` with certificate and option data only.
 
@@ -93,10 +93,10 @@ await self._certificate_reconciler.ensure_own_certificate_matches(
 Add a new public method:
 
 ```python
-def clone(self, client: turbobt.Bittensor) -> "ShieldedSubnetReference":
+def clone(self, client: turbobt.Bittensor) -> "LegacySubnetReference":
 ```
 
-`clone(...)` returns a new `ShieldedSubnetReference` with:
+`clone(...)` returns a new `LegacySubnetReference` with:
 
 - the same `netuid`
 - the same `wallet` object
@@ -110,7 +110,7 @@ Reusing `_certificate_reconciler` is safe after the refactor because it no longe
 
 ## Testing
 
-Add one focused public-API test for `ShieldedSubnetReference.clone(...)` that:
+Add one focused public-API test for `LegacySubnetReference.clone(...)` that:
 
 1. Creates an original subnet reference.
 2. Creates a distinct client object.

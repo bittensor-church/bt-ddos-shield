@@ -4,7 +4,7 @@
 
 **Goal:** Add production-package mock contact implementations, downstream-facing testing helpers, committed real certificate fixtures, and public-API tests that cover reconciliation, concurrent manifest resolution, and TTL behavior without any real subtensor communication.
 
-**Architecture:** Keep the low-level test seam aligned with the contact singleton factories: repository tests patch `bittensor_subtensor_contact()` / `turbo_bittensor_subtensor_contact()` and mocked HTTP responses only. Add mutable declarative mock contacts in the production package plus a higher-level `testing.py` helper layer that hides contact patching and manifest setup for downstream users, while all tests continue to exercise `ShieldMetagraph`, `ShieldedBittensor`, and `ShieldedSubnetReference.from_bittensor(...)` through public APIs.
+**Architecture:** Keep the low-level test seam aligned with the contact singleton factories: repository tests patch `bittensor_subtensor_contact()` / `turbo_bittensor_subtensor_contact()` and mocked HTTP responses only. Add mutable declarative mock contacts in the production package plus a higher-level `testing.py` helper layer that hides contact patching and manifest setup for downstream users, while all tests continue to exercise `ShieldMetagraph`, `LegacyTurbobtWrapper`, and `LegacySubnetReference.from_bittensor(...)` through public APIs.
 
 **Tech Stack:** Python 3.11+, `pytest`, `pytest-asyncio`, `aioresponses`, `freezegun`, existing certificate/encryption helpers in `bt_ddos_shield_client`
 
@@ -33,7 +33,7 @@
   - Replace `SimpleNamespace` object builders with real `NeuronInfo` / `turbobt.neuron.Neuron` factory helpers plus manifest helpers.
 - Modify: `bt_ddos_shield_client/tests/test_shield_metagraph.py`
   - Rewrite to use public API, patched singleton factory, mocked HTTP responses, and frozen time.
-- Modify: `bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py`
+- Modify: `test_legacy_turbobt_wrapper.py`
   - Rewrite to use public API, patched singleton factory, mocked HTTP responses, and frozen time.
 - Create: `bt_ddos_shield_client/tests/test_testing_helpers.py`
   - Add public-API tests for the downstream helper layer.
@@ -245,7 +245,7 @@ def patched_bittensor_contact(monkeypatch) -> MockBittensorSubtensorContact:
 def patched_turbo_bittensor_contact(monkeypatch) -> MockTurboBittensorSubtensorContact:
     contact = MockTurboBittensorSubtensorContact()
     monkeypatch.setattr(
-        "bt_ddos_shield_client.shielded_turbobt.shielded_bittensor.turbo_bittensor_subtensor_contact",
+        "legacy_turbobt_wrapper.py.turbo_bittensor_subtensor_contact",
         lambda: contact,
     )
     return contact
@@ -258,7 +258,7 @@ Run:
 ```bash
 uv run --project bt_ddos_shield_client pytest \
   bt_ddos_shield_client/tests/test_shield_metagraph.py::test_shield_metagraph_uses_option_certificate_path \
-  bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py::test_shielded_subnet_reference_is_public -v
+  test_legacy_turbobt_wrapper.py::test_shielded_subnet_reference_is_public -v
 ```
 
 Expected: one or both tests FAIL until the rewritten helpers land in the next tasks, but the imports and fixture files are now in place.
@@ -285,7 +285,7 @@ git commit -m "test: add shield certificate fixtures"
 
 - [ ] **Step 1: Write the failing mock-contact tests**
 
-Add tests to `bt_ddos_shield_client/tests/test_shield_metagraph.py` and `bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py` for the public mock classes:
+Add tests to `bt_ddos_shield_client/tests/test_shield_metagraph.py` and `test_legacy_turbobt_wrapper.py` for the public mock classes:
 
 ```python
 from bt_ddos_shield_client.contacts import MockBittensorSubtensorContact
@@ -325,7 +325,7 @@ Run:
 ```bash
 uv run --project bt_ddos_shield_client pytest \
   bt_ddos_shield_client/tests/test_shield_metagraph.py::test_mock_bittensor_contact_records_and_mutates_state \
-  bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py::test_mock_turbobt_contact_records_listing_calls -v
+  test_legacy_turbobt_wrapper.py::test_mock_turbobt_contact_records_listing_calls -v
 ```
 
 Expected: FAIL because the mock contact classes do not exist yet.
@@ -449,7 +449,7 @@ Run:
 ```bash
 uv run --project bt_ddos_shield_client pytest \
   bt_ddos_shield_client/tests/test_shield_metagraph.py::test_mock_bittensor_contact_records_and_mutates_state \
-  bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py::test_mock_turbobt_contact_records_listing_calls -v
+  test_legacy_turbobt_wrapper.py::test_mock_turbobt_contact_records_listing_calls -v
 ```
 
 Expected: PASS
@@ -462,7 +462,7 @@ git add bt_ddos_shield_client/bt_ddos_shield_client/contacts.py \
         bt_ddos_shield_client/bt_ddos_shield_client/__init__.py \
         bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/__init__.py \
         bt_ddos_shield_client/tests/test_shield_metagraph.py \
-        bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py
+        test_legacy_turbobt_wrapper.py
 git commit -m "feat: add shield contact test mocks"
 ```
 
@@ -826,7 +826,7 @@ git commit -m "test: cover shield metagraph public behavior"
 ## Task 5: Rewrite Turbobt Public-API Tests and Helper-Layer Tests
 
 **Files:**
-- Modify: `bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py`
+- Modify: `test_legacy_turbobt_wrapper.py`
 - Modify: `bt_ddos_shield_client/tests/test_testing_helpers.py`
 
 - [ ] **Step 1: Write the failing turbobt public-API test**
@@ -851,7 +851,7 @@ async def test_shielded_subnet_reference_uploads_when_on_chain_cert_is_missing(p
     destination = tmp_path / "validator.pem"
     destination.write_text(certificate_fixture_path("validator_a.pem").read_text())
 
-    bittensor = ShieldedBittensor(
+    bittensor = LegacyTurbobtWrapper(
         "test",
         wallet=make_wallet(),
         ddos_shield_netuid=7,
@@ -872,13 +872,13 @@ async def test_shielded_subnet_reference_uploads_when_on_chain_cert_is_missing(p
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `uv run --project bt_ddos_shield_client pytest bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py::test_shielded_subnet_reference_uploads_when_on_chain_cert_is_missing -v`
+Run: `uv run --project bt_ddos_shield_client pytest test_legacy_turbobt_wrapper.py::test_shielded_subnet_reference_uploads_when_on_chain_cert_is_missing -v`
 
 Expected: FAIL until the module is rewritten against the new seam.
 
 - [ ] **Step 3: Rewrite the turbobt test module**
 
-Rewrite `bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py` to cover:
+Rewrite `test_legacy_turbobt_wrapper.py` to cover:
 
 - missing cert upload
 - mismatched cert upload
@@ -886,7 +886,7 @@ Rewrite `bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py
 - mid-test mutation
 - TTL behavior with frozen time
 - mixed shielded/unshielded neuron listing
-- `ShieldedSubnetReference.from_bittensor(...)` end-to-end
+- `LegacySubnetReference.from_bittensor(...)` end-to-end
 - manifest timeout leaves original endpoint intact
 - malformed manifest leaves original endpoint intact
 - 5xx manifest leaves original endpoint intact
@@ -924,7 +924,7 @@ async def test_manifest_failures_leave_original_turbobt_endpoint(
     )
     destination = tmp_path / "validator.pem"
     destination.write_text(certificate_fixture_path("validator_a.pem").read_text())
-    bittensor = ShieldedBittensor(
+    bittensor = LegacyTurbobtWrapper(
         "test",
         wallet=make_wallet(),
         ddos_shield_netuid=7,
@@ -969,7 +969,7 @@ Run:
 
 ```bash
 uv run --project bt_ddos_shield_client pytest \
-  bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py \
+  test_legacy_turbobt_wrapper.py \
   bt_ddos_shield_client/tests/test_testing_helpers.py -v
 ```
 
@@ -978,7 +978,7 @@ Expected: all tests in both modules PASS
 - [ ] **Step 6: Commit the turbobt and helper tests**
 
 ```bash
-git add bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py \
+git add test_legacy_turbobt_wrapper.py \
         bt_ddos_shield_client/tests/test_testing_helpers.py \
         bt_ddos_shield_client/bt_ddos_shield_client/testing.py
 git commit -m "test: cover shield turbobt and helper layers"
@@ -991,7 +991,7 @@ git commit -m "test: cover shield turbobt and helper layers"
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/contacts.py`
 - Modify: `bt_ddos_shield_client/bt_ddos_shield_client/testing.py`
 - Modify: `bt_ddos_shield_client/tests/test_shield_metagraph.py`
-- Modify: `bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py`
+- Modify: `test_legacy_turbobt_wrapper.py`
 - Modify: `bt_ddos_shield_client/tests/test_testing_helpers.py`
 
 - [ ] **Step 1: Reconcile imports and package exports**
@@ -1008,11 +1008,11 @@ __all__ = ["ShieldMetagraph", "ShieldMetagraphTestRig"]
 For turbobt package exports:
 
 ```python
-from .shielded_bittensor import ShieldedBittensor as ShieldedBittensor
-from .shielded_bittensor import ShieldedSubnetReference as ShieldedSubnetReference
+from .neuron_mutator import LegacyTurbobtWrapper as LegacyTurbobtWrapper
+from .neuron_mutator import LegacySubnetReference as LegacySubnetReference
 from .contacts import MockTurboBittensorSubtensorContact as MockTurboBittensorSubtensorContact
 
-__all__ = ["ShieldedBittensor", "ShieldedSubnetReference", "MockTurboBittensorSubtensorContact"]
+__all__ = ["LegacyTurbobtWrapper", "LegacySubnetReference", "MockTurboBittensorSubtensorContact"]
 ```
 
 - [ ] **Step 2: Run the full library test suite**
@@ -1045,7 +1045,7 @@ git diff -- bt_ddos_shield_client/bt_ddos_shield_client/contacts.py \
            bt_ddos_shield_client/bt_ddos_shield_client/testing.py \
            bt_ddos_shield_client/tests/fixtures.py \
            bt_ddos_shield_client/tests/test_shield_metagraph.py \
-           bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py \
+           test_legacy_turbobt_wrapper.py \
            bt_ddos_shield_client/tests/test_testing_helpers.py \
            bt_ddos_shield_client/pyproject.toml
 ```
@@ -1073,7 +1073,7 @@ git add bt_ddos_shield_client/bt_ddos_shield_client/contacts.py \
         bt_ddos_shield_client/tests/fixtures/certs/validator_c.pem \
         bt_ddos_shield_client/tests/fixtures/certs/README.md \
         bt_ddos_shield_client/tests/test_shield_metagraph.py \
-        bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py \
+        test_legacy_turbobt_wrapper.py \
         bt_ddos_shield_client/tests/test_testing_helpers.py \
         bt_ddos_shield_client/pyproject.toml
 git commit -m "test: add shield contact mocks and public api coverage"

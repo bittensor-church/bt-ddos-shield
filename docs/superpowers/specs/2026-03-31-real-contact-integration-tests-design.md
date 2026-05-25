@@ -8,7 +8,7 @@ Add a dedicated pytest integration layer for the real `BittensorSubtensorContact
 
 - Add real-integration tests for the real contact implementations.
 - Limit the test surface to the public methods of the contact classes.
-- Keep these tests separate from the lighter public-API tests for wrappers such as `ShieldMetagraph` and `ShieldedBittensor`.
+- Keep these tests separate from the lighter public-API tests for wrappers such as `ShieldMetagraph` and `LegacyTurbobtWrapper`.
 - Make the tests opt-in locally through pytest marks.
 - Make the tests practical for CI to run.
 - Update the repo-wide engineering standards so real adapter implementations must have separate real-service tests.

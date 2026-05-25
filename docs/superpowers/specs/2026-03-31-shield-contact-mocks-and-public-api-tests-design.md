@@ -10,7 +10,7 @@ Add production-package mock implementations for the shield contact abstractions 
 - Make the mocks declarative and easy to configure in domain terms rather than subtensor transport terms.
 - Make the mocks mutable during a single test so chain state and upload behavior can change between calls.
 - Record all contact calls in a structured way for direct assertions in tests.
-- Expand tests to cover public behavior through `ShieldMetagraph`, `ShieldedBittensor`, and `ShieldedSubnetReference.from_bittensor(...)`.
+- Expand tests to cover public behavior through `ShieldMetagraph`, `LegacyTurbobtWrapper`, and `LegacySubnetReference.from_bittensor(...)`.
 - Provide downstream-facing fixture-style helpers that hide contact patching and manifest mocking under the hood.
 - Use committed real certificate/key fixtures and clock control for TTL coverage.
 
@@ -110,7 +110,7 @@ The call log must be directly accessible to tests without additional patching.
 Tests should patch:
 
 - `bt_ddos_shield_client.shield_metagraph.bittensor_subtensor_contact`
-- `bt_ddos_shield_client.shielded_turbobt.shielded_bittensor.turbo_bittensor_subtensor_contact`
+- `legacy_turbobt_wrapper.py.turbo_bittensor_subtensor_contact`
 
 Those patched factory functions should return the mutable production-package mocks.
 
@@ -172,8 +172,8 @@ All new tests should touch the public API only.
 ### Public Surfaces Under Test
 
 - `ShieldMetagraph(...)` followed by `sync()`
-- `ShieldedBittensor(...).subnet(...).list_neurons()`
-- `ShieldedSubnetReference.from_bittensor(...).list_neurons()`
+- `LegacyTurbobtWrapper(...).subnet(...).list_neurons()`
+- `LegacySubnetReference.from_bittensor(...).list_neurons()`
 
 ### Allowed Test Seams
 
@@ -206,7 +206,7 @@ For the turbobt path:
 - mutable mock state changes behavior mid-test
 - TTL behavior matches the metagraph path
 - mixed shielded/unshielded neurons resolve correctly through concurrent manifest fetching
-- `ShieldedSubnetReference.from_bittensor(...)` works end-to-end
+- `LegacySubnetReference.from_bittensor(...)` works end-to-end
 - read failure surfaces through the public API
 - upload failure surfaces through the public API
 

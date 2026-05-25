@@ -74,7 +74,7 @@ The shield-address application step must not rely on tuple or list ordering. Int
 
 ## Integration
 
-`ShieldedSubnetReference` should delegate to the new helper instead of owning the rewrite loop directly.
+`LegacySubnetReference` should delegate to the new helper instead of owning the rewrite loop directly.
 
 Updated `list_neurons()` flow:
 
@@ -82,7 +82,7 @@ Updated `list_neurons()` flow:
 2. call `await self._neuron_mutator.mutate_neurons(self.client, neurons)`
 3. return the same `neurons` list
 
-`ShieldedBittensor` should construct and pass through a `ShieldedNeuronMutator` instance when creating shielded subnet references so the existing public API keeps working.
+`LegacyTurbobtWrapper` should construct and pass through a `ShieldedNeuronMutator` instance when creating shielded subnet references so the existing public API keeps working.
 
 ## Error Handling
 
@@ -113,12 +113,12 @@ Add public-boundary tests covering:
 - the new mutator leaves neurons unchanged for manifest failures or invalid content
 - the new mutator applies rewrites by miner hotkey rather than by returned order
 - duplicate hotkeys raise `ValueError`
-- `ShieldedSubnetReference.list_neurons()` delegates through the mutator and preserves existing behavior
+- `LegacySubnetReference.list_neurons()` delegates through the mutator and preserves existing behavior
 
 ## Files Expected To Change
 
-- `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/shielded_bittensor.py`
+- `legacy_turbobt_wrapper.py`
 - `bt_ddos_shield_client/bt_ddos_shield_client/shielded_turbobt/__init__.py`
-- `bt_ddos_shield_client/tests/shielded_turbobt/test_shielded_bittensor.py`
+- `test_legacy_turbobt_wrapper.py`
 
-Adding a new focused module under `shielded_turbobt` for the mutator is preferred if that keeps responsibilities clearer than extending `shielded_bittensor.py`.
+Adding a new focused module under `shielded_turbobt` for the mutator is preferred if that keeps responsibilities clearer than extending `legacy_turbobt_wrapper.py`.

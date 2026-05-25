@@ -81,17 +81,6 @@ metagraph = ShieldMetagraph(wallet, netuid, subtensor=subtensor)
 ```
 
 ```python
-from bt_ddos_shield_client.shielded_turbobt import ShieldedBittensor
-
-async with ShieldedBittensor(
-    network,
-    wallet=wallet,
-    ddos_shield_netuid=netuid,
-) as bittensor:
-    neurons = await bittensor.subnet(netuid).list_neurons()
-```
-
-```python
 from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
 
 mutator = ShieldedNeuronMutator(
