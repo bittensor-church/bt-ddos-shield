@@ -1,33 +1,14 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-import os
 
 from bittensor import Subtensor
 from bittensor.core.metagraph import Metagraph
 
 from bt_ddos_shield_client.certificate_reconciliation import CertificateReconciler
-from bt_ddos_shield_client.client import ShieldClient
+from bt_ddos_shield_client.client import ShieldClient, resolve_certificate_path
 from bt_ddos_shield_client.contacts import bittensor_subtensor_contact
 from bt_ddos_shield_client.internal import parse_shield_address, run_async_in_thread
-
-
-@dataclass
-class ShieldMetagraphOptions:
-    certificate_path: str | None = None
-    disable_uploading_certificate: bool = False
-
-
-def resolve_certificate_path(configured_path: str | None) -> str:
-    if configured_path is not None:
-        return configured_path
-
-    env_path = os.getenv('VALIDATOR_SHIELD_CERTIFICATE_PATH')
-    if env_path is not None:
-        return env_path
-
-    return './validator_cert.pem'
 
 
 class ShieldMetagraph(Metagraph):
@@ -40,7 +21,6 @@ class ShieldMetagraph(Metagraph):
         sync: bool = True,
         block: int | None = None,
         subtensor=None,
-        options: ShieldMetagraphOptions | None = None,
     ):
         if subtensor is None:
             subtensor = Subtensor(network=network)
@@ -52,14 +32,10 @@ class ShieldMetagraph(Metagraph):
             subtensor=subtensor,
         )
         self.wallet = wallet
-        self.options = options or ShieldMetagraphOptions()
         self._contact = bittensor_subtensor_contact()
-        self._shield_client = ShieldClient(
-            certificate_path=resolve_certificate_path(self.options.certificate_path),
-        )
+        self._shield_client = ShieldClient(wallet=wallet)
         self._certificate_reconciler = CertificateReconciler(
             certificate=self._shield_client.certificate,
-            disabled=self.options.disable_uploading_certificate,
         )
         self._async_executor = ThreadPoolExecutor(
             max_workers=4,

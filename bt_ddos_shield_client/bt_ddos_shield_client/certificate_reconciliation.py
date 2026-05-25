@@ -20,7 +20,6 @@ def _contact_client_kwargs(method, client: object) -> dict[str, object]:
 @dataclass
 class CertificateReconciler:
     certificate: Certificate
-    disabled: bool = False
     match_ttl_seconds: float = 300.0
     _matched_public_key: str | None = None
     _matched_until: float = 0.0
@@ -44,7 +43,7 @@ class CertificateReconciler:
         hotkey: str,
         wallet,
     ) -> None:
-        if self.disabled or self._is_match_cached():
+        if self._is_match_cached():
             return
 
         public_key = await contact.get_own_public_key(

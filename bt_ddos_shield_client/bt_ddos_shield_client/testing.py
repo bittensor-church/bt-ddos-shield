@@ -15,11 +15,22 @@ from bittensor.utils.balance import Balance
 from bt_ddos_shield_client.certificates import EDDSACertificateManager
 from bt_ddos_shield_client.contacts import MockBittensorSubtensorContact
 from bt_ddos_shield_client.encryption import ECIESEncryptionManager
-from bt_ddos_shield_client.shield_metagraph import ShieldMetagraph, ShieldMetagraphOptions
+from bt_ddos_shield_client.shield_metagraph import ShieldMetagraph
 
 
-def _make_wallet(hotkey: str = 'validator-hotkey'):
-    return SimpleNamespace(hotkey=SimpleNamespace(ss58_address=hotkey))
+def _make_wallet(hotkey: str = 'validator-hotkey', hotkey_path: str | Path = '/tmp/wallets/validator/hotkeys/default'):
+    return SimpleNamespace(
+        hotkey=SimpleNamespace(ss58_address=hotkey),
+        hotkey_file=SimpleNamespace(path=str(hotkey_path)),
+    )
+
+
+def _install_certificate_next_to_hotkey(source_path: str, tmp_path: Path) -> object:
+    hotkey_path = tmp_path / 'wallets' / 'validator' / 'hotkeys' / 'default'
+    hotkey_path.parent.mkdir(parents=True, exist_ok=True)
+    destination = Path(str(hotkey_path) + '.cert.pem')
+    destination.write_text(Path(source_path).read_text())
+    return _make_wallet(hotkey_path=hotkey_path)
 
 
 def _make_bittensor_neuron(*, hotkey: str, ip: str, port: int, uid: int) -> NeuronInfo:
@@ -143,8 +154,7 @@ class ShieldMetagraphTestRig:
         from aioresponses import aioresponses
 
         certificate = EDDSACertificateManager.load_certificate(self.validator_certificate_path)
-        destination = tmp_path / 'validator.pem'
-        destination.write_text(Path(self.validator_certificate_path).read_text())
+        wallet = _install_certificate_next_to_hotkey(self.validator_certificate_path, tmp_path)
         self.contact.set_metagraph_sync(
             [
                 _make_bittensor_neuron(hotkey=miner.hotkey, ip=miner.ip, port=miner.port, uid=index)
@@ -170,11 +180,10 @@ class ShieldMetagraphTestRig:
                     )
 
                 yield ShieldMetagraph(
-                    wallet=_make_wallet(),
+                    wallet=wallet,
                     netuid=7,
                     subtensor=object(),
                     sync=False,
-                    options=ShieldMetagraphOptions(certificate_path=str(destination)),
                 )
 
 
@@ -182,7 +191,6 @@ class ShieldMetagraphTestRig:
 class ShieldedNeuronMutatorContext:
     wallet: object
     netuid: int
-    ddos_shield_options: ShieldMetagraphOptions
     bittensor: object
     neurons: list[object]
 
@@ -220,14 +228,11 @@ class ShieldedNeuronMutatorTestRig:
         from aioresponses import aioresponses
 
         certificate = EDDSACertificateManager.load_certificate(self.validator_certificate_path)
-        destination = tmp_path / 'validator.pem'
-        destination.write_text(Path(self.validator_certificate_path).read_text())
+        wallet = _install_certificate_next_to_hotkey(self.validator_certificate_path, tmp_path)
         neurons = [
             _make_turbobt_neuron(hotkey=miner.hotkey, ip=miner.ip, port=miner.port, uid=index)
             for index, miner in enumerate(self.miners)
         ]
-        wallet = _make_wallet()
-        ddos_shield_options = ShieldMetagraphOptions(certificate_path=str(destination))
         bittensor = turbobt.Bittensor('test', wallet=wallet)
 
         with aioresponses() as mocked:
@@ -246,7 +251,6 @@ class ShieldedNeuronMutatorTestRig:
             yield ShieldedNeuronMutatorContext(
                 wallet=wallet,
                 netuid=7,
-                ddos_shield_options=ddos_shield_options,
                 bittensor=bittensor,
                 neurons=neurons,
             )

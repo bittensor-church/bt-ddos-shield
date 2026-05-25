@@ -1,35 +1,52 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from aioresponses import aioresponses
 from freezegun import freeze_time
 import pytest
 
 from bt_ddos_shield_client import ShieldMetagraph
-from bt_ddos_shield_client.shield_metagraph import ShieldMetagraphOptions
+from bt_ddos_shield_client.shield_metagraph import resolve_certificate_path
 from tests.fakes import build_manifest_body, build_manifest_body_from_blob, make_bittensor_neuron, make_wallet
 from tests.fixtures import certificate_fixture_path, load_certificate_fixture
 
 
-def _certificate_path(tmp_path, fixture_name: str = 'validator_a.pem') -> str:
-    destination = tmp_path / 'validator.pem'
-    destination.write_text(certificate_fixture_path(fixture_name).read_text())
-    return str(destination)
+def _make_wallet_with_certificate(tmp_path, fixture_name: str = 'validator_a.pem'):
+    hotkey_path = tmp_path / 'wallets' / 'validator' / 'hotkeys' / 'default'
+    hotkey_path.parent.mkdir(parents=True, exist_ok=True)
+    certificate_path = Path(str(hotkey_path) + '.cert.pem')
+    certificate_path.write_text(certificate_fixture_path(fixture_name).read_text())
+    return make_wallet(hotkey_path=hotkey_path)
 
 
 def _make_metagraph(tmp_path, fixture_name: str = 'validator_a.pem') -> ShieldMetagraph:
     return ShieldMetagraph(
-        wallet=make_wallet(),
+        wallet=_make_wallet_with_certificate(tmp_path, fixture_name),
         netuid=7,
         subtensor=object(),
         sync=False,
-        options=ShieldMetagraphOptions(certificate_path=_certificate_path(tmp_path, fixture_name)),
     )
 
 
 def _manifest_url(ip: str, port: int) -> str:
     return f'http://{ip}:{port}/shield_manifest.json'
+
+
+def test_resolve_certificate_path_uses_env_override(monkeypatch, tmp_path):
+    wallet = make_wallet(hotkey_path=tmp_path / 'wallets' / 'validator' / 'hotkeys' / 'default')
+    override = tmp_path / 'custom.pem'
+    monkeypatch.setenv('VALIDATOR_SHIELD_CERTIFICATE_PATH', str(override))
+
+    assert resolve_certificate_path(wallet) == str(override)
+
+
+def test_resolve_certificate_path_defaults_next_to_hotkey_file(monkeypatch, tmp_path):
+    monkeypatch.delenv('VALIDATOR_SHIELD_CERTIFICATE_PATH', raising=False)
+    wallet = make_wallet(hotkey_path=tmp_path / 'wallets' / 'validator' / 'hotkeys' / 'default')
+
+    assert resolve_certificate_path(wallet) == str(tmp_path / 'wallets' / 'validator' / 'hotkeys' / 'default.cert.pem')
 
 
 @freeze_time('2026-03-31 12:00:00')

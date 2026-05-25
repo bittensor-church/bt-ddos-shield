@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from ipaddress import ip_address
+from pathlib import Path
 from types import SimpleNamespace
 
 from bittensor.core.chain_data import AxonInfo, NeuronInfo, PrometheusInfo
@@ -14,8 +15,11 @@ from turbobt.neuron import AxonProtocolEnum, Neuron as TurboNeuron, PrometheusIn
 from bt_ddos_shield_client.encryption import ECIESEncryptionManager
 
 
-def make_wallet(hotkey: str = 'validator-hotkey'):
-    return SimpleNamespace(hotkey=SimpleNamespace(ss58_address=hotkey))
+def make_wallet(hotkey: str = 'validator-hotkey', hotkey_path: str | Path = '/tmp/wallets/validator/hotkeys/default'):
+    return SimpleNamespace(
+        hotkey=SimpleNamespace(ss58_address=hotkey),
+        hotkey_file=SimpleNamespace(path=str(hotkey_path)),
+    )
 
 
 def make_bittensor_neuron(

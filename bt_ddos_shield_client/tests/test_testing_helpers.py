@@ -69,7 +69,6 @@ async def test_shielded_neuron_mutator_test_rig_produces_final_public_addresses(
         mutator = ShieldedNeuronMutator(
             wallet=context.wallet,
             netuid=context.netuid,
-            ddos_shield_options=context.ddos_shield_options,
             contact=rig.contact,
         )
         result = await mutator.mutate_neurons(context.bittensor, context.neurons)
@@ -95,7 +94,6 @@ async def test_shielded_neuron_mutator_test_rig_surfaces_upload_failures(tmp_pat
         mutator = ShieldedNeuronMutator(
             wallet=context.wallet,
             netuid=context.netuid,
-            ddos_shield_options=context.ddos_shield_options,
             contact=rig.contact,
         )
         with pytest.raises(RuntimeError, match='upload failed'):

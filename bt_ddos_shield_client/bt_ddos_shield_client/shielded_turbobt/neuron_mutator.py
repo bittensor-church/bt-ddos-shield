@@ -8,7 +8,6 @@ import turbobt.neuron
 from bt_ddos_shield_client.certificate_reconciliation import CertificateReconciler
 from bt_ddos_shield_client.client import ShieldClient
 from bt_ddos_shield_client.internal import parse_shield_address
-from bt_ddos_shield_client.shield_metagraph import ShieldMetagraphOptions, resolve_certificate_path
 from bt_ddos_shield_client.shielded_turbobt.contacts import turbo_bittensor_subtensor_contact
 
 
@@ -18,21 +17,16 @@ class ShieldedNeuronMutator:
         *,
         wallet,
         netuid: int,
-        ddos_shield_options: ShieldMetagraphOptions | None = None,
         contact=None,
         shield_client: ShieldClient | None = None,
         certificate_reconciler: CertificateReconciler | None = None,
     ):
         self.wallet = wallet
         self.netuid = netuid
-        self.ddos_shield_options = ddos_shield_options or ShieldMetagraphOptions()
         self._contact = contact or turbo_bittensor_subtensor_contact()
-        self._shield_client = shield_client or ShieldClient(
-            certificate_path=resolve_certificate_path(self.ddos_shield_options.certificate_path),
-        )
+        self._shield_client = shield_client or ShieldClient(wallet=wallet)
         self._certificate_reconciler = certificate_reconciler or CertificateReconciler(
             certificate=self._shield_client.certificate,
-            disabled=self.ddos_shield_options.disable_uploading_certificate,
         )
 
     async def mutate_neurons(

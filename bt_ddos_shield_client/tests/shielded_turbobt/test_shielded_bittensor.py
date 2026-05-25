@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from aioresponses import aioresponses
 from freezegun import freeze_time
 import pytest
 
-from bt_ddos_shield_client.shield_metagraph import ShieldMetagraphOptions
 from tests.fakes import build_manifest_body, build_manifest_body_from_blob, make_turbobt_neuron, make_wallet
 from tests.fixtures import certificate_fixture_path, load_certificate_fixture
 
@@ -15,18 +15,19 @@ pytest.importorskip('turbobt')
 from bt_ddos_shield_client.shielded_turbobt import ShieldedBittensor, ShieldedSubnetReference
 
 
-def _certificate_path(tmp_path, fixture_name: str = 'validator_a.pem') -> str:
-    destination = tmp_path / 'validator.pem'
-    destination.write_text(certificate_fixture_path(fixture_name).read_text())
-    return str(destination)
+def _make_wallet_with_certificate(tmp_path, fixture_name: str = 'validator_a.pem'):
+    hotkey_path = tmp_path / f'wallets-{fixture_name}' / 'validator' / 'hotkeys' / 'default'
+    hotkey_path.parent.mkdir(parents=True, exist_ok=True)
+    certificate_path = Path(str(hotkey_path) + '.cert.pem')
+    certificate_path.write_text(certificate_fixture_path(fixture_name).read_text())
+    return make_wallet(hotkey_path=hotkey_path)
 
 
 def _make_bittensor(tmp_path, fixture_name: str = 'validator_a.pem') -> ShieldedBittensor:
     return ShieldedBittensor(
         'test',
-        wallet=make_wallet(),
+        wallet=_make_wallet_with_certificate(tmp_path, fixture_name),
         ddos_shield_netuid=7,
-        ddos_shield_options=ShieldMetagraphOptions(certificate_path=_certificate_path(tmp_path, fixture_name)),
     )
 
 
@@ -308,8 +309,7 @@ async def test_shielded_subnet_reference_from_bittensor_works_end_to_end(
     subnet = ShieldedSubnetReference.from_bittensor(
         bittensor,
         7,
-        wallet=make_wallet(),
-        ddos_shield_options=ShieldMetagraphOptions(certificate_path=_certificate_path(tmp_path)),
+        wallet=_make_wallet_with_certificate(tmp_path),
     )
 
     with aioresponses() as mocked:
@@ -329,8 +329,7 @@ def test_shielded_subnet_reference_clone_reuses_helpers_and_swaps_client(tmp_pat
     original = ShieldedSubnetReference.from_bittensor(
         _make_bittensor(tmp_path),
         7,
-        wallet=make_wallet(),
-        ddos_shield_options=ShieldMetagraphOptions(certificate_path=_certificate_path(tmp_path)),
+        wallet=_make_wallet_with_certificate(tmp_path),
     )
     new_client = _make_bittensor(tmp_path, fixture_name='validator_b.pem')
 
@@ -341,7 +340,6 @@ def test_shielded_subnet_reference_clone_reuses_helpers_and_swaps_client(tmp_pat
     assert cloned.client is not original.client
     assert cloned.netuid == original.netuid
     assert cloned.wallet is original.wallet
-    assert cloned.ddos_shield_options is original.ddos_shield_options
     assert cloned._contact is original._contact
     assert cloned._neuron_mutator is original._neuron_mutator
     assert cloned._shield_client is original._shield_client

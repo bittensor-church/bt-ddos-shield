@@ -25,6 +25,8 @@ For each miner axon, it:
 
 If fetch, redirect, deserialization, or decryption fails, that miner is treated as unshielded.
 
+The validator certificate is loaded from `VALIDATOR_SHIELD_CERTIFICATE_PATH` when that environment variable is set. Otherwise the client stores it next to the wallet hotkey file as `<hotkey>.cert.pem`, for example `~/.bittensor/wallets/validator/hotkeys/default.cert.pem`.
+
 ## Install
 
 ```bash
@@ -39,16 +41,10 @@ pip install "bt-ddos-shield-client[turbobt]"
 
 ## Run Tests
 
-From the repository root:
-
-```bash
-uv run --group test pytest bt_ddos_shield_client/tests -v
-```
-
 From inside the `bt_ddos_shield_client` directory:
 
 ```bash
-uv run --project . --python 3.12 --group test pytest tests -v
+uv run --group test pytest tests -v
 ```
 
 The test suite stays at the public boundary:
@@ -63,16 +59,10 @@ The real `BittensorSubtensorContact` and `TurboBittensorSubtensorContact` implem
 
 Those tests are marked with `subtensor_integration`, so they are excluded from the default local pytest run.
 
-Run them explicitly from the repository root with:
-
-```bash
-uv run --group test pytest bt_ddos_shield_client/tests/contacts -m subtensor_integration -v
-```
-
 Or from inside the `bt_ddos_shield_client` directory:
 
 ```bash
-uv run --project . --python 3.12 --group test pytest tests/contacts -m subtensor_integration -v
+uv run --group test pytest tests/contacts -m subtensor_integration -v
 ```
 
 Behavior:
@@ -106,13 +96,11 @@ async with ShieldedBittensor(
 ```
 
 ```python
-from bt_ddos_shield_client.shield_metagraph import ShieldMetagraphOptions
 from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
 
 mutator = ShieldedNeuronMutator(
     wallet=wallet,
     netuid=netuid,
-    ddos_shield_options=ShieldMetagraphOptions(certificate_path='./validator_cert.pem'),
 )
 
 neurons = await bittensor.subnet(netuid).list_neurons()

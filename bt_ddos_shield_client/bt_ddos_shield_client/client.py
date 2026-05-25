@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 import os
+from pathlib import Path
 
 from bt_ddos_shield_client.certificates import Certificate, EDDSACertificateManager
 from bt_ddos_shield_client.encryption import ECIESEncryptionManager
@@ -10,16 +11,25 @@ from bt_ddos_shield_client.manifest import JsonManifestSerializer, fetch_manifes
 from bt_ddos_shield_client.types import Hotkey, ShieldAddress
 
 
+def resolve_certificate_path(wallet: object | None = None) -> str:
+    env_path = os.getenv('VALIDATOR_SHIELD_CERTIFICATE_PATH')
+    if env_path is not None:
+        return env_path
+
+    if wallet is None:
+        raise ValueError('wallet is required when VALIDATOR_SHIELD_CERTIFICATE_PATH is not set')
+
+    hotkey_path = Path(str(wallet.hotkey_file.path))
+    return str(hotkey_path.with_name(f'{hotkey_path.name}.cert.pem'))
+
+
 class ShieldClient:
     def __init__(
         self,
-        certificate_path: str | None = None,
+        wallet: object | None = None,
         manifest_timeout: int = 10,
     ):
-        self.certificate_path = certificate_path or os.getenv(
-            'VALIDATOR_SHIELD_CERTIFICATE_PATH',
-            './validator_cert.pem',
-        )
+        self.certificate_path = resolve_certificate_path(wallet)
         self.manifest_timeout = manifest_timeout
         self.certificate_manager = EDDSACertificateManager()
         self.encryption_manager = ECIESEncryptionManager()
