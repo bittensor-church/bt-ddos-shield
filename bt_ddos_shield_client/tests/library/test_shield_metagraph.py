@@ -9,8 +9,8 @@ import pytest
 
 from bt_ddos_shield_client import ShieldMetagraph
 from bt_ddos_shield_client.shield_metagraph import resolve_certificate_path
-from tests.fakes import build_manifest_body, build_manifest_body_from_blob, make_bittensor_neuron, make_wallet
-from tests.fixtures import certificate_fixture_path, load_certificate_fixture
+from tests.library.fakes import build_manifest_body, build_manifest_body_from_blob, make_bittensor_neuron, make_wallet
+from tests.library.fixtures import certificate_fixture_path, load_certificate_fixture
 
 
 def _make_wallet_with_certificate(tmp_path, fixture_name: str = 'validator_a.pem'):

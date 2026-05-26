@@ -7,8 +7,8 @@ from aioresponses import aioresponses
 from freezegun import freeze_time
 import pytest
 
-from tests.fakes import build_manifest_body, make_turbobt_neuron, make_wallet
-from tests.fixtures import certificate_fixture_path, load_certificate_fixture
+from tests.library.fakes import build_manifest_body, make_turbobt_neuron, make_wallet
+from tests.library.fixtures import certificate_fixture_path, load_certificate_fixture
 
 pytest.importorskip('turbobt')
 

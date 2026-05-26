@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import turbobt
 
-from tests.contacts.local_subtensor import start_local_subtensor_env
+from tests.library.contacts.local_subtensor import start_local_subtensor_env
 
 
 @pytest.fixture(scope='session')

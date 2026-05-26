@@ -6,7 +6,7 @@ import pytest
 from bittensor.core.extrinsics.serving import serve_extrinsic
 
 from server_shield.subtensor_contact import BittensorSubtensorContact
-from tests.contacts.local_subtensor import start_local_subtensor_env
+from tests.library.contacts import start_local_subtensor_env
 
 
 VALIDATOR_1_PUBLIC_KEY = "19cbdfa697f07f27af8bb280bcee651697f0423ee2ba8529fb4e4000036cb134"

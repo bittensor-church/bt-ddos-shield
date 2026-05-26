@@ -170,9 +170,13 @@ class ShieldMetagraphTestRig:
     miners: list[_MinerFixture] = field(default_factory=list)
     contact: MockBittensorSubtensorContact = field(default_factory=MockBittensorSubtensorContact)
     validator_certificate_path: str | None = None
+    validator_hotkey: str = 'validator-hotkey'
 
     def set_validator_certificate_path(self, path: str | Path) -> None:
         self.validator_certificate_path = str(path)
+
+    def set_validator_hotkey(self, hotkey: str) -> None:
+        self.validator_hotkey = hotkey
 
     def set_on_chain_certificate(
         self,
@@ -208,25 +212,30 @@ class ShieldMetagraphTestRig:
             'bt_ddos_shield_client.shield_metagraph.bittensor_subtensor_contact',
             return_value=self.contact,
         ):
-            with aioresponses() as mocked:
-                for miner in self.miners:
-                    url = f'http://{miner.ip}:{miner.port}/shield_manifest.json'
-                    if miner.shield_address is None:
-                        mocked.get(url, status=404, repeat=True)
-                        continue
-                    mocked.get(
-                        url,
-                        status=200,
-                        body=_build_manifest_body(certificate.public_key, miner.shield_address),
-                        repeat=True,
-                    )
+            with patch('bt_ddos_shield_client.shield_metagraph.Subtensor', return_value=object()):
+                with aioresponses() as mocked:
+                    for miner in self.miners:
+                        url = f'http://{miner.ip}:{miner.port}/shield_manifest.json'
+                        if miner.shield_address is None:
+                            mocked.get(url, status=404, repeat=True)
+                            continue
+                        mocked.get(
+                            url,
+                            status=200,
+                            body=_build_manifest_body(
+                                certificate.public_key,
+                                miner.shield_address,
+                                validator_hotkey=self.validator_hotkey,
+                            ),
+                            repeat=True,
+                        )
 
-                yield ShieldMetagraph(
-                    wallet=wallet,
-                    netuid=7,
-                    subtensor=object(),
-                    sync=False,
-                )
+                    yield ShieldMetagraph(
+                        wallet=wallet,
+                        netuid=7,
+                        subtensor=object(),
+                        sync=False,
+                    )
 
 
 @dataclass(frozen=True)
@@ -297,9 +306,13 @@ class ShieldedNeuronMutatorTestRig:
     miners: list[_MinerFixture] = field(default_factory=list)
     contact: object = field(default_factory=_make_mock_turbo_bittensor_contact)
     validator_certificate_path: str | None = None
+    validator_hotkey: str = 'validator-hotkey'
 
     def set_validator_certificate_path(self, path: str | Path) -> None:
         self.validator_certificate_path = str(path)
+
+    def set_validator_hotkey(self, hotkey: str) -> None:
+        self.validator_hotkey = hotkey
 
     def set_on_chain_certificate(
         self,
@@ -331,27 +344,37 @@ class ShieldedNeuronMutatorTestRig:
             for index, miner in enumerate(self.miners)
         ]
         bittensor = turbobt.Bittensor('test', wallet=wallet)
+        self.contact.set_neuron_listing(neurons)
+
+        async def list_neurons(_subnet, block_hash=None):
+            return neurons
 
         with patch(
             'bt_ddos_shield_client.shielded_turbobt.neuron_mutator.turbo_bittensor_subtensor_contact',
             return_value=self.contact,
         ):
-            with aioresponses() as mocked:
-                for miner in self.miners:
-                    url = f'http://{miner.ip}:{miner.port}/shield_manifest.json'
-                    if miner.shield_address is None:
-                        mocked.get(url, status=404, repeat=True)
-                        continue
-                    mocked.get(
-                        url,
-                        status=200,
-                        body=_build_manifest_body(certificate.public_key, miner.shield_address),
-                        repeat=True,
-                    )
+            with patch('bt_ddos_shield_client.shield_metagraph.Subtensor', return_value=object()):
+                with patch('turbobt.subnet.SubnetReference.list_neurons', list_neurons):
+                    with aioresponses() as mocked:
+                        for miner in self.miners:
+                            url = f'http://{miner.ip}:{miner.port}/shield_manifest.json'
+                            if miner.shield_address is None:
+                                mocked.get(url, status=404, repeat=True)
+                                continue
+                            mocked.get(
+                                url,
+                                status=200,
+                                body=_build_manifest_body(
+                                    certificate.public_key,
+                                    miner.shield_address,
+                                    validator_hotkey=self.validator_hotkey,
+                                ),
+                                repeat=True,
+                            )
 
-                yield ShieldedNeuronMutatorContext(
-                    wallet=wallet,
-                    netuid=7,
-                    bittensor=bittensor,
-                    neurons=neurons,
-                )
+                        yield ShieldedNeuronMutatorContext(
+                            wallet=wallet,
+                            netuid=7,
+                            bittensor=bittensor,
+                            neurons=neurons,
+                        )
