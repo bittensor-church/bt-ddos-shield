@@ -32,7 +32,7 @@ class ShieldMetagraph(Metagraph):
             subtensor=subtensor,
         )
         self.wallet = wallet
-        self._contact = bittensor_subtensor_contact()
+        self._contact: SubtensorContact | None = None
         self._shield_client = ShieldClient(wallet=wallet)
         self._certificate_reconciler = CertificateReconciler(
             certificate=self._shield_client.certificate,
@@ -47,13 +47,18 @@ class ShieldMetagraph(Metagraph):
         elif block is not None:
             raise ValueError('Block argument is valid only when sync is True')
 
+    def _get_contact(self) -> AbstractBittensorSubtensorContact:
+        if self._contact is None:
+            self._contact = bittensor_subtensor_contact()
+        return self._contact
+
     def sync(self, block: int | None = None, lite: bool | None = None, subtensor=None):
         if subtensor is not None and subtensor is not self.subtensor:
             self.subtensor = subtensor
-        self._contact.sync_metagraph(self, subtensor=self.subtensor, block=block, lite=lite)
+        self._get_contact().sync_metagraph(self, subtensor=self.subtensor, block=block, lite=lite)
         run_async_in_thread(
             self._certificate_reconciler.ensure_own_certificate_matches(
-                contact=self._contact,
+                contact=self._get_contact(),
                 client=self.subtensor,
                 netuid=self.netuid,
                 hotkey=self.wallet.hotkey.ss58_address,

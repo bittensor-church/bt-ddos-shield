@@ -125,6 +125,48 @@ class _MinerFixture:
 
 @dataclass
 class ShieldMetagraphTestRig:
+    """Install mocks around user code that constructs `ShieldMetagraph`.
+
+    Example user file:
+
+        # validator.py
+        from bt_ddos_shield_client import ShieldMetagraph
+
+        SOME_CONFIG_PROBABLY = load_config()  # this is subnet specific
+
+        shield_metagraph = ShieldMetagraph(
+            wallet=SOME_CONFIG_PROBABLY.wallet,
+            netuid=SOME_CONFIG_PROBABLY.netuid,
+            network=SOME_CONFIG_PROBABLY.network,
+        )
+
+        def send_message_to_all_neurons():
+            shield_metagraph.sync()
+            fox axon in shield_metagraph.axons:
+                requests.post(f"http://{axon.ip}:{axon.port}/message", json={"message": "hello world"})}")
+
+    Example test file:
+
+        # test_validator.py
+        from validator import send_message_to_all_neurons
+        from bt_ddos_shield_client.testing import ShieldMetagraphTestRig
+
+        def test_send_message_to_all_neurons(tmp_path):
+            rig = ShieldMetagraphTestRig()
+            rig.set_validator_certificate_path(certificate_fixture_path('validator_a.pem'))
+            rig.set_on_chain_certificate(load_certificate_fixture('validator_a.pem').public_key)
+            rig.add_miner('miner-a', '198.51.100.10', 8080, shield_address='203.0.113.10:3030')
+
+            with rig.install(tmp_path=tmp_path) as context:
+                send_message_to_all_neurons()  # this will not make any external IO for the sake of the ddos shield
+
+
+    The rig kicks in at `install()`: while the context is open,
+    `ShieldMetagraph` still comes from user code, but its subtensor contact,
+    wallet certificate, metagraph neurons, and HTTP miner manifests come from
+    deterministic test doubles.
+    """
+
     miners: list[_MinerFixture] = field(default_factory=list)
     contact: MockBittensorSubtensorContact = field(default_factory=MockBittensorSubtensorContact)
     validator_certificate_path: str | None = None
@@ -197,6 +239,61 @@ class ShieldedNeuronMutatorContext:
 
 @dataclass
 class ShieldedNeuronMutatorTestRig:
+    """Install mocks around user code that constructs `ShieldedNeuronMutator`.
+
+    Example user file:
+
+        # shield_client_user_code.py
+        from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
+
+        async def shielded_neurons(wallet, netuid, bittensor, neurons):
+            mutator = ShieldedNeuronMutator(wallet=wallet, netuid=netuid)
+            return await mutator.mutate_neurons(bittensor, neurons)
+
+        # validator.py
+        import turbobt
+        from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
+
+        SOME_CONFIG_PROBABLY = load_config()  # this is subnet specific
+
+        mutator = ShieldedNeuronMutator(
+            wallet=SOME_CONFIG_PROBABLY.wallet,
+            netuid=SOME_CONFIG_PROBABLY.netuid,
+        )
+
+        bittensor = turbobt.bittensor(network=SOME_CONFIG_PROBABLY.network)
+
+        sn = bittensor.subnet(SOME_CONFIG_PROBABLY.netuid)
+
+
+        def send_message_to_all_neurons():
+
+            shield_metagraph.sync()
+            for neuron in await mutator.mutate_neurons(bittensor, await sn.list_neurons()):
+                requests.post(f"http://{neuron.axon_info.ip}:{neuron.axon_info.port}/message",
+                              json={"message": "hello world"})}")
+
+    Example test file:
+
+        # test_validator.py
+        from bt_ddos_shield_client.testing import ShieldedNeuronMutatorTestRig
+        from shield_client_user_code import shielded_neurons
+
+        async def test_send_message_to_all_neurons(tmp_path):
+            rig = ShieldedNeuronMutatorTestRig()
+            rig.set_validator_certificate_path(certificate_fixture_path('validator_a.pem'))
+            rig.set_on_chain_certificate(load_certificate_fixture('validator_a.pem').public_key)
+            rig.add_miner('miner-a', '198.51.100.20', 8090, shield_address='203.0.113.20:3040')
+
+            with rig.install(tmp_path=tmp_path) as context:
+                neurons = send_message_to_all_neurons()  # this will not make any external IO for the sake of the ddos shield
+
+    The rig kicks in at `install()`: while the context is open,
+    `ShieldedNeuronMutator` still comes from user code, but its default
+    subtensor contact, wallet certificate, turbobt neurons, and HTTP miner
+    manifests come from deterministic test doubles.
+    """
+
     miners: list[_MinerFixture] = field(default_factory=list)
     contact: object = field(default_factory=_make_mock_turbo_bittensor_contact)
     validator_certificate_path: str | None = None
@@ -235,22 +332,26 @@ class ShieldedNeuronMutatorTestRig:
         ]
         bittensor = turbobt.Bittensor('test', wallet=wallet)
 
-        with aioresponses() as mocked:
-            for miner in self.miners:
-                url = f'http://{miner.ip}:{miner.port}/shield_manifest.json'
-                if miner.shield_address is None:
-                    mocked.get(url, status=404, repeat=True)
-                    continue
-                mocked.get(
-                    url,
-                    status=200,
-                    body=_build_manifest_body(certificate.public_key, miner.shield_address),
-                    repeat=True,
-                )
+        with patch(
+            'bt_ddos_shield_client.shielded_turbobt.neuron_mutator.turbo_bittensor_subtensor_contact',
+            return_value=self.contact,
+        ):
+            with aioresponses() as mocked:
+                for miner in self.miners:
+                    url = f'http://{miner.ip}:{miner.port}/shield_manifest.json'
+                    if miner.shield_address is None:
+                        mocked.get(url, status=404, repeat=True)
+                        continue
+                    mocked.get(
+                        url,
+                        status=200,
+                        body=_build_manifest_body(certificate.public_key, miner.shield_address),
+                        repeat=True,
+                    )
 
-            yield ShieldedNeuronMutatorContext(
-                wallet=wallet,
-                netuid=7,
-                bittensor=bittensor,
-                neurons=neurons,
-            )
+                yield ShieldedNeuronMutatorContext(
+                    wallet=wallet,
+                    netuid=7,
+                    bittensor=bittensor,
+                    neurons=neurons,
+                )

@@ -17,17 +17,21 @@ class ShieldedNeuronMutator:
         *,
         wallet,
         netuid: int,
-        contact=None,
         shield_client: ShieldClient | None = None,
         certificate_reconciler: CertificateReconciler | None = None,
     ):
         self.wallet = wallet
         self.netuid = netuid
-        self._contact = contact or turbo_bittensor_subtensor_contact()
+        self._contact: AbstractTurboBittensorSubtensorContact | None = None
         self._shield_client = shield_client or ShieldClient(wallet=wallet)
         self._certificate_reconciler = certificate_reconciler or CertificateReconciler(
             certificate=self._shield_client.certificate,
         )
+
+    def _get_contact(self) -> AbstractTurboBittensorSubtensorContact:
+        if self._contact is None:
+            self._contact = turbo_bittensor_subtensor_contact()
+        return self._contact
 
     async def mutate_neurons(
         self,
@@ -35,7 +39,7 @@ class ShieldedNeuronMutator:
         neurons: list[turbobt.neuron.Neuron],
     ) -> list[turbobt.neuron.Neuron]:
         await self._certificate_reconciler.ensure_own_certificate_matches(
-            contact=self._contact,
+            contact=self._get_contact(),
             client=bittensor,
             netuid=self.netuid,
             hotkey=self.wallet.hotkey.ss58_address,

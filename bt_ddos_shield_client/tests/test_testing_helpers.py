@@ -8,6 +8,14 @@ from bt_ddos_shield_client.testing import ShieldMetagraphTestRig, ShieldedNeuron
 from tests.fixtures import certificate_fixture_path, load_certificate_fixture
 
 
+async def _user_code_mutates_neurons_with_default_contact(wallet, netuid, bittensor, neurons):
+    mutator = ShieldedNeuronMutator(
+        wallet=wallet,
+        netuid=netuid,
+    )
+    return await mutator.mutate_neurons(bittensor, neurons)
+
+
 def test_metagraph_test_rig_produces_final_public_addresses(tmp_path):
     rig = ShieldMetagraphTestRig()
     rig.set_validator_certificate_path(certificate_fixture_path('validator_a.pem'))
@@ -98,3 +106,26 @@ async def test_shielded_neuron_mutator_test_rig_surfaces_upload_failures(tmp_pat
         )
         with pytest.raises(RuntimeError, match='upload failed'):
             await mutator.mutate_neurons(context.bittensor, context.neurons)
+
+
+@pytest.mark.asyncio
+async def test_shielded_neuron_mutator_test_rig_patches_default_contact_for_user_code(tmp_path):
+    pytest.importorskip('turbobt')
+
+    rig = ShieldedNeuronMutatorTestRig()
+    rig.set_validator_certificate_path(certificate_fixture_path('validator_a.pem'))
+    rig.set_on_chain_certificate(load_certificate_fixture('validator_a.pem').public_key)
+    rig.add_miner('miner-a', '198.51.100.23', 8093, shield_address='203.0.113.23:3043')
+
+    with rig.install(tmp_path=tmp_path) as context:
+        result = await _user_code_mutates_neurons_with_default_contact(
+            context.wallet,
+            context.netuid,
+            context.bittensor,
+            context.neurons,
+        )
+
+    assert result is context.neurons
+    assert [(neuron.hotkey, str(neuron.axon_info.ip), neuron.axon_info.port) for neuron in context.neurons] == [
+        ('miner-a', '203.0.113.23', 3043),
+    ]
