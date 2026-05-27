@@ -9,6 +9,7 @@ project_dir="${repo_root}/server_shield/pulumi_project"
 set -a
 source "${env_file}"
 set +a
+SERVER_SHIELD_STATE_DIR=$(realpath -- ${SERVER_SHIELD_STATE_DIR})
 
 mkdir -p /tmp/pulumi-state
 cd "$script_dir"/..

@@ -96,6 +96,7 @@ def get_address_for_validator(
 ) -> ShieldAddress | None:
     encrypted_url = manifest.encrypted_url_mapping.get(validator_hotkey)
     if encrypted_url is None:
+        logger.debug(f"Validator {validator_hotkey} missing in miner {miner_hotkey} manifest")
         return None
 
     try:
