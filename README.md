@@ -1,196 +1,195 @@
-
 # BT DDoS Shield
 
 [![PyPI](https://img.shields.io/pypi/v/bt-ddos-shield-client)](https://pypi.org/project/bt-ddos-shield-client/)
 [![License](https://img.shields.io/github/license/bactensor/bt-ddos-shield)](https://github.com/bactensor/bt-ddos-shield/blob/main/LICENSE)
 
-BT DDoS Shield is a solution designed for **Bittensor subnet owners who want to protect miners from Distributed Denial-of-Service (DDoS)** attacks and foster honest competition.
+BT DDoS Shield helps Bittensor subnet operators keep miner connection details off-chain. Validators use the client package as a drop-in metagraph wrapper, while miners run the server shield to publish validator-specific protected addresses.
 
-The basic principle behind the shield is to assign multiple addresses to miners - one for each validator - **instead of exposing the miner's public IP in the metagraph**. 
-These addresses are communicated to validators encrypted with ECIES 
-([Elliptic Curve Integrated Encryption Scheme](https://github.com/ecies/py)) keys published by the validators. 
-This creates **a secure, permissionless method of distributing miner connection details**.
+The shield has two main parts:
 
-To use the shield in a subnet, the validator code must be modified by replacing the standard `metagraph` from the `bittensor` 
-library with the drop-in replacement `bt_ddos_shield_client.ShieldMetagraph`. 
-**Each miner is then responsible for running the shield server** to secure their infrastructure. 
-Unshielded miners will still be reachable by their default public addresses published to the metagraph.
+- `bt_ddos_shield_client`: validator-side Python package with `ShieldMetagraph`, optional `turbobt` support, and public testing helpers.
+- `server_shield`: miner-side Docker service that provisions AWS infrastructure, builds encrypted manifests for validators, and publishes the miner's shield endpoint to chain.
 
-BT DDoS Shield offers a scalable and **cost-effective solution for subnets handling large volumes of data**.
+## How It Works
 
-## Product Highlights
+1. A validator runs the client package and publishes its shield certificate to chain.
+2. A miner runs the server shield against its AWS EC2 miner instance and Route 53 hosted zone.
+3. The server shield reads validator certificates from chain, creates a unique DNS name for each eligible validator, and writes `shield_manifest.json`.
+4. AWS routes validator traffic through a Network Load Balancer, an internal Application Load Balancer, and WAF host allow rules.
+5. The validator client fetches each miner's manifest from `http://{axon_ip}:{axon_port}/shield_manifest.json`, decrypts the entry for its own hotkey, and replaces that miner's axon endpoint when the manifest entry is valid.
 
-BT DDoS Shield delivers a secure, decentralized, and scalable solution that:
+Miners without a working shield manifest are treated as unshielded by validators and remain reachable through their metagraph axon addresses.
 
-- **Eliminates vulnerabilities:** Keeps sensitive IP addresses and ports off-chain, reducing the attack surface.
-- **Encrypts the handshake:** Uses ECIES ([Elliptic Curve Integrated Encryption Scheme](https://github.com/ecies/py)) 
-  to securely exchange connection information between miners and validators.
-- **Delivers cost-effective defense:** Provides a decentralized alternative to traditional DDoS protection methods, maintaining performance while minimizing attack vectors.
+## Repository Layout
 
-## Getting Started
+- [bt_ddos_shield_client/README.md](bt_ddos_shield_client/README.md): install, API, usage, and tests for the validator client package.
+- `server_shield/`: miner-side service, Docker image, Pulumi program, and tests.
+- `manual_tests/`: local scripts for manual subtensor and end-to-end checks.
+- [docs/engineering-standards.md](docs/engineering-standards.md): repository engineering and testing standards.
 
-If you're a **subnet owner**, enable `bt-ddos-shield-client` in your validator code 
-(see [Using Shield on Client (Validator) Side](#using-shield-on-client-validator-side)) so that everything runs automatically. 
-**Validators** can review the detailed workings in that section.
+## Validator Client
 
-If you're a **miner**, activate `bt-ddos-shield-server` on your end by running it as described in the [Running Shield on Server (Miner) Side](#running-shield-on-server-miner-side) section.
+Install the validator-side package with:
 
-We welcome your contributions—see [Contribution Guidelines](#contribution-guidelines) for more information. 
+```bash
+pip install bt-ddos-shield-client
+```
 
-For requests, feedback, or questions, **join us on the [ComputeHorde Discord channel](https://discordapp.com/channels/799672011265015819/1201941624243109888)**.
+Use `ShieldMetagraph` where validator code would normally use `bittensor.core.metagraph.Metagraph`:
 
-Also, be sure to check out our subnet and other products at [ComputeHorde](https://computehorde.io).
+```python
+from bt_ddos_shield_client import ShieldMetagraph
 
-Contributor and agent standards live in [docs/engineering-standards.md](docs/engineering-standards.md).
+metagraph = ShieldMetagraph(wallet, netuid, subtensor=subtensor)
+```
 
+Install the optional `turbobt` integration when validator code uses `turbobt` neurons:
 
-## Running Shield on server (Miner) side
+```bash
+pip install "bt-ddos-shield-client[turbobt]"
+```
 
-### Disclaimers
+See the [client README](bt_ddos_shield_client/README.md) for complete validator-side behavior, certificate handling, public APIs, and test helpers.
 
-* As for now BT DDoS Shield can only be used for hiding AWS EC2 server and uses AWS ELB and WAF to handle communication.
+## Miner Server
 
-### Prerequisites
+The miner-side server shield is distributed as a Docker image built from `server_shield/Dockerfile`. It provisions an AWS-backed shield for a miner running on EC2, using Route 53, S3, WAF, an internal ALB, and an internet-facing NLB.
 
-* AWS account with given privileges:
-  * `ec2:DescribeInstances`
-  * `ec2:DescribeVpcs`
-  * `ec2:DescribeAvailabilityZones`
-  * `ec2:CreateSubnet`
-  * `ec2:DeleteSubnet`
-  * `ec2:DescribeSubnets`
-  * `ec2:CreateSecurityGroup`
-  * `ec2:DeleteSecurityGroup`
-  * `ec2:AuthorizeSecurityGroupIngress`
-  * `wafv2:CreateWebACL`
-  * `wafv2:DeleteWebACL`
-  * `wafv2:GetWebACL`
-  * `wafv2:UpdateWebACL`
-  * `wafv2:AssociateWebACL`
-  * `wafv2:DisassociateWebACL`
-  * `elasticloadbalancing:CreateLoadBalancer`
-  * `elasticloadbalancing:DeleteLoadBalancer`
-  * `elasticloadbalancing:DescribeLoadBalancers`
-  * `elasticloadbalancing:CreateListener`
-  * `elasticloadbalancing:CreateRule`
-  * `elasticloadbalancing:CreateTargetGroup`
-  * `elasticloadbalancing:DeleteTargetGroup`
-  * `elasticloadbalancing:RegisterTargets`
-  * `elasticloadbalancing:DeregisterTargets`
-  * `route53:ListHostedZones`
-  * `route53:ChangeResourceRecordSets`
-  * `route53:ListResourceRecordSets`
-  * `route53:GetHostedZone`
-  * `s3:PutObject`
-* A domain, either 
-  * registered via AWS; or
-  * via another registrar, a Route 53 hosted zone created for it, and name servers configured to match those of the Route 53 hosted zone     
-* Hosted zone id from the previous step, can be obtained from `aws route53 list-hosted-zones --query "HostedZones[].{Name:Name,Id:Id}" --output table `
-* Miner's server needs to respond to ELB health checks. This can be done by configuring server to respond with 200 status
-to `GET /` request on server's traffic port. Also, server security group should allow traffic from ELB.
-* Miner hotkey - the shield server process will need access to it.
+### Requirements
 
+- AWS credentials that can manage the required EC2, ELBv2, WAFv2, Route 53, and S3 resources.
+- An EC2 instance running the miner service.
+- A Route 53 hosted zone for the shield domain.
+- A miner hotkey registered on the target subnet.
+- Miner service health checks that return HTTP 200 for `GET /` on the miner traffic port.
+- Network rules that allow the shield-created load balancer security group to reach the miner port.
+- A Pulumi backend URL for server shield state.
 
-### Miner part internal architecture
+### Build
 
-The server shield lives under `server_shield` as one Python project with 3 internal components:
-
-- `pulumi_runner`: provisions and updates the AWS infrastructure
-- `chain_reader`: reads the validator set and validator certs from chain, then reconciles `desired_domains.json`
-- `chain_writer`: publishes the miner axon info back to chain when `axon_public_ip.json` is available
-
-These components communicate through typed JSON state files stored in the server shield state directory. On initial bootstrap the files always exist, but their values may be `null`, empty arrays, or empty objects so downstream components can skip work without treating missing upstream data as an error.
-
-Current state files:
-
-- `root_domain.json`: `{ "domain": null }`
-- `axon_public_ip.json`: `{ "ip": null }`
-- `desired_domains.json`: `{ "domains": {} }`
-- `blacklist.json`: `[]`
-- `manifest.json`:
-
-Behavior notes:
-
-- If `root_domain.json` still contains `null`, the chain reader exits cleanly and leaves `desired_domains.json` unchanged.
-- The chain reader fetches validators from chain, excludes any hotkeys listed in `blacklist.json`, excludes validators with missing or invalid certs, reconciles `desired_domains.json`, and writes `manifest.json`.
-- Existing validator domains stay stable across runs unless the validator cert changes or the root domain changes.
-- `manifest.json` contains the final JSON that Pulumi uploads to S3 as `shield_manifest.json`.
-- All state files are written with stable pretty-printed JSON so diffs and Pulumi content hashes do not churn unnecessarily.
-- If `desired_domains.json` contains no domains, the Pulumi runner still applies the base infrastructure and skips the host-based WAF allow rules.
-- If `axon_public_ip.json` still contains `null`, the chain writer exits cleanly and does nothing.
-- All three components run in one Docker image, attempt one run every minute, never overlap with themselves, and each run is capped at 20 minutes.
-- Logs from all three components stay on stdout/stderr, so they are visible through `docker logs`.
-- Uncaught exceptions and non-zero exits are reported to Sentry when `SENTRY_DSN` is configured.
-- Configuration is parsed from environment variables via shared Pydantic settings; the application code does not load `.env` files directly.
-
-Build the Docker image from the repository root with:
+Run the Docker build from the repository root:
 
 ```bash
 docker build -f server_shield/Dockerfile -t server-shield:local .
 ```
 
-Pulumi backend is Pulumi's internal configuration paramter, more or less responsible for determining where Pulumi 
-persists its state. It can be a local file, a cloud object storage url etc. See Pulumi docs for options, this project only
-passes this env var to Pulumi. `SERVER_SHIELD_PULUMI__BACKEND_URL` is mandatory.
+The image contains three supervised components:
 
-If you want `blacklist.json` and the other shared state files to persist across container restarts, mount 
-`/var/lib/server-shield/state` when running the server container. This is recommended in production.
+- `server-shield-pulumi`: applies the Pulumi program and writes the root domain and NLB public IP into local state.
+- `server-shield-chain-reader`: reads validator certificates from chain, reconciles desired validator domains, and writes the encrypted manifest.
+- `server-shield-chain-writer`: publishes the shield NLB public IP and miner port to chain when the miner hotkey is registered.
 
-Local backend file example:
+The container runs each component once per minute. Component runs do not overlap with themselves, each run has a 20 minute timeout by default, and logs are written to stdout/stderr.
+
+### Configuration
+
+The service reads configuration from environment variables with the `SERVER_SHIELD_` prefix. It does not load `.env` files itself; pass environment variables through Docker, your process supervisor, or your deployment system.
+
+Required variables:
 
 ```dotenv
-SERVER_SHIELD_PULUMI__BACKEND_URL=file:///var/lib/server-shield/pulumi-state
-SERVER_SHIELD_PULUMI__STACK_NAME=server-shield
-SERVER_SHIELD_PULUMI__SHIELD_BACKEND=AWS
 SERVER_SHIELD_MINER_PORT=9001
 SERVER_SHIELD_SUBTENSOR_ADDRESS=ws://...
 SERVER_SHIELD_NETUID=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME=...
 SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY=...
+SERVER_SHIELD_PULUMI__BACKEND_URL=file:///var/lib/server-shield/pulumi-state
+SERVER_SHIELD_PULUMI__STACK_NAME=server-shield
+SERVER_SHIELD_PULUMI__SHIELD_BACKEND=AWS
 SERVER_SHIELD_PULUMI__AWS__AWS_ACCESS_KEY_ID=...
 SERVER_SHIELD_PULUMI__AWS__AWS_SECRET_ACCESS_KEY=...
 SERVER_SHIELD_PULUMI__AWS__AWS_REGION=eu-north-1
-SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID=...
-SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID=...
+SERVER_SHIELD_PULUMI__AWS__MINER_INSTANCE_ID=i-...
+SERVER_SHIELD_PULUMI__AWS__HOSTED_ZONE_ID=Z...
 ```
 
-Run the container with a persistent Pulumi state volume:
+Optional variables:
+
+```dotenv
+SERVER_SHIELD_ENV=production
+SERVER_SHIELD_LOG_LEVEL=INFO
+SERVER_SHIELD_SENTRY_DSN=...
+SERVER_SHIELD_STATE_DIR=/var/lib/server-shield/state
+RUN_TIMEOUT=20m
+LOCK_DIR=/tmp/server-shield-locks
+```
+
+`SERVER_SHIELD_PULUMI__STACK_NAME` defaults to `server-shield`. `SERVER_SHIELD_PULUMI__SHIELD_BACKEND` must be `AWS`.
+
+### State Files
+
+Server shield state defaults to `/var/lib/server-shield/state`. Mount this directory in production so validator domains, manifests, the discovered root domain, the discovered NLB public IP, and operator blacklist edits survive container restarts.
+
+The state directory contains:
+
+- `root_domain.json`: hosted zone domain discovered by the Pulumi program.
+- `axon_public_ip.json`: NLB public IP discovered by the Pulumi program.
+- `desired_domains.json`: validator hotkey to DNS name and certificate mapping.
+- `blacklist.json`: validator hotkeys excluded by the operator.
+- `manifest.json`: `shield_manifest.json` content uploaded to S3.
+
+Missing state files are created from bundled examples. State writes are atomic and pretty-printed with stable key ordering.
+
+### Run
+
+With a local Pulumi backend:
 
 ```bash
 docker run \
   --env-file .env \
   --volume server-shield-pulumi-state:/var/lib/server-shield/pulumi-state \
-  --volume /opt/bittensor-ddos-shield/state/:/var/lib/server-shield/state \
+  --volume /opt/bittensor-ddos-shield/state:/var/lib/server-shield/state \
   server-shield:local
 ```
 
-If the automated Pulumi runner needs operator intervention, you can run manual Pulumi commands inside the container with:
+With an S3 Pulumi backend:
+
+```dotenv
+SERVER_SHIELD_PULUMI__BACKEND_URL=s3://my-pulumi-state-bucket/server-shield
+```
+
+```bash
+docker run \
+  --env-file .env \
+  --volume /opt/bittensor-ddos-shield/state:/var/lib/server-shield/state \
+  server-shield:local
+```
+
+For local file backends, persist `/var/lib/server-shield/pulumi-state`. For S3 backends, create the bucket ahead of container startup.
+
+### Operations
+
+Edit `blacklist.json` in the state directory to exclude validators. The file is a JSON array of validator hotkeys. The chain reader removes blacklisted validators from `desired_domains.json` and the manifest on its next run.
+
+Manual Pulumi commands can be run inside the container with:
 
 ```bash
 docker exec <container-name> shield-pulumi refresh --clear-pending-creates
 docker exec <container-name> shield-pulumi import ...
 ```
 
-`shield-pulumi` runs from the Pulumi project directory with the same Pulumi backend/AWS environment as the scheduled runner and goes through the same supervisor lock. If the automated Pulumi run is active, the manual command will skip rather than overlapping it.
+`shield-pulumi` uses the same Pulumi backend, AWS environment, project directory, and supervisor lock as the scheduled Pulumi runner. If the scheduled runner is active, the manual command exits without overlapping it.
 
-S3 backend example:
+Uncaught exceptions, non-zero component exits, and timeouts are reported to Sentry when `SERVER_SHIELD_SENTRY_DSN` is set.
 
-```dotenv
-SERVER_SHIELD_PULUMI__BACKEND_URL=s3://my-pulumi-state-bucket/server-shield
-SERVER_SHIELD_PULUMI__STACK_NAME=server-shield
-SERVER_SHIELD_PULUMI__SHIELD_BACKEND=AWS
-...
-```
+## Development
 
-Run the container against the S3 backend:
+Run client tests from the client package:
 
 ```bash
-docker run \
-  --env-file .env \
-  --volume /opt/bittensor-ddos-shield/state/:/var/lib/server-shield/state \
-  server-shield:local
+cd bt_ddos_shield_client
+uv run --group test pytest tests -v
 ```
 
-The build command must be run from the repository root so `COPY server_shield ...` in the Dockerfile can see the project files. For the local file backend, `/var/lib/server-shield/pulumi-state` must be persisted with a Docker volume. For the S3 backend, the bucket must already exist. In both cases, `/var/lib/server-shield/state` should be persisted if you want the shared JSON state and `blacklist.json` edits to survive restarts. `SERVER_SHIELD_PULUMI__STACK_NAME` is optional and defaults to `server-shield`. `SERVER_SHIELD_PULUMI__SHIELD_BACKEND` is currently required and must be `AWS`. `SERVER_SHIELD_SUBTENSOR_ADDRESS`, `SERVER_SHIELD_NETUID`, `SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME`, and `SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY` are also required.
+Run server tests from the server package:
 
-Operators control validator exclusions through `blacklist.json`, which is a JSON array of validator hotkeys in the shared state directory. Add a hotkey to remove that validator from `desired_domains.json` on the next `chain_reader` run. Remove a hotkey to let the chain reader add it back if it is still a validator with a valid cert.
+```bash
+cd server_shield
+uv run --group dev pytest tests -v
+```
+
+Both packages mark Docker-backed subtensor integration tests with `subtensor_integration`; default pytest configuration excludes that marker.
+
+## Community
+
+For requests, feedback, or questions, join the [ComputeHorde Discord channel](https://discordapp.com/channels/799672011265015819/1201941624243109888). You can also learn more about ComputeHorde at [computehorde.io](https://computehorde.io).

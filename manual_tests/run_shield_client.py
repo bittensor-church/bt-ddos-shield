@@ -13,6 +13,14 @@ from turbobt import Bittensor
 from bittensor_wallet import bittensor_wallet
 from dotenv import load_dotenv
 
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    force=True,
+)
+
+logging.getLogger("websockets").setLevel(logging.INFO)
 
 load_dotenv(pathlib.Path(__file__).parent / '.env')
 
@@ -26,17 +34,17 @@ miner_wallet = bittensor_wallet.Wallet(
     os.environ['SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY'],
 )
 
-# gra = ShieldMetagraph(
-#     bittensor_wallet.Wallet(
-#         os.environ['BITTENSOR_VALIDATOR_WALLET_NAME'],
-#         os.environ['BITTENSOR_VALIDATOR_WALLET_HOTKEY']
-#     ),
-#     int(os.environ['SERVER_SHIELD_NETUID']),
-#     os.environ['SERVER_SHIELD_SUBTENSOR_ADDRESS'],
-# )
-#
-# for neuron in gra.neurons:
-#     print(neuron.hotkey, neuron.axon_info.ip, neuron.axon_info.port)
+gra = ShieldMetagraph(
+    bittensor_wallet.Wallet(
+        os.environ['BITTENSOR_VALIDATOR_WALLET_NAME'],
+        os.environ['BITTENSOR_VALIDATOR_WALLET_HOTKEY']
+    ),
+    int(os.environ['SERVER_SHIELD_NETUID']),
+    os.environ['SERVER_SHIELD_SUBTENSOR_ADDRESS'],
+)
+
+for neuron in gra.neurons:
+    print(neuron.hotkey, neuron.axon_info.ip, neuron.axon_info.port)
 
 
 async def main():

@@ -27,7 +27,7 @@ fill in `.env` values and run. the current config also requires:
 - `SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY`
 
 ```bash
-./run_pulumu.sh
+./run_pulumi.sh
 ```
 
 if you want to destroy the infra to save costs:

@@ -8,6 +8,7 @@ env_file="${script_dir}/.env"
 set -a
 source "${env_file}"
 set +a
+SERVER_SHIELD_STATE_DIR=$(realpath -- ${SERVER_SHIELD_STATE_DIR})
 
 cd "$script_dir"/..
 cd server_shield
