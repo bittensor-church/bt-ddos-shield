@@ -1,6 +1,6 @@
 [project]
 name = "bt_ddos_shield_client"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 dynamic = [
     "version",
 ]
@@ -9,13 +9,13 @@ dependencies = [
     "bittensor~=9.0",
     "bittensor-wallet~=4.0",
     "cryptography~=43.0",
-    "eciespy~=0.4",
+    "pycryptodome>=3.21.0,<4",
     "aiohttp>=3.12.13,<4",
 ]
 
 [project.optional-dependencies]
 turbobt = [
-    "turbobt~=0.3.1",
+    "turbobt~=0.3.1; python_version < '3.14'",
 ]
 
 [dependency-groups]
