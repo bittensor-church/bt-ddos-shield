@@ -6,6 +6,8 @@ The package resolves shielded miner endpoints from miner manifests and mutates v
 
 ## Install
 
+The base client supports Python 3.11 through 3.14.
+
 ```bash
 pip install bt-ddos-shield-client
 ```
@@ -16,6 +18,8 @@ Install optional `turbobt` support with:
 pip install "bt-ddos-shield-client[turbobt]"
 ```
 
+The optional `turbobt` extra is currently limited to Python 3.11 through 3.13 because upstream `turbobt` depends on `eciespy`, which pulls `coincurve`.
+
 ## Public API
 
 - `bt_ddos_shield_client.ShieldMetagraph`
@@ -24,7 +28,7 @@ pip install "bt-ddos-shield-client[turbobt]"
 
 ## Certificate Handling
 
-The client uses an ECIES key pair stored as a validator shield certificate. The public key is uploaded to the subnet certificate field when the local certificate does not match the value already stored on chain.
+The client uses an Ed25519 ECIES-compatible key pair stored as a validator shield certificate. The public key is uploaded to the subnet certificate field when the local certificate does not match the value already stored on chain.
 
 Certificate path resolution:
 

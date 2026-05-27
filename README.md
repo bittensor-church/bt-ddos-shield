@@ -35,6 +35,8 @@ Install the validator-side package with:
 pip install bt-ddos-shield-client
 ```
 
+The base client supports Python 3.11 through 3.14.
+
 Use `ShieldMetagraph` where validator code would normally use `bittensor.core.metagraph.Metagraph`:
 
 ```python
@@ -48,6 +50,8 @@ Install the optional `turbobt` integration when validator code uses `turbobt` ne
 ```bash
 pip install "bt-ddos-shield-client[turbobt]"
 ```
+
+The optional `turbobt` extra is currently limited to Python 3.11 through 3.13 because upstream `turbobt` still depends on `eciespy`/`coincurve`.
 
 See the [client README](bt_ddos_shield_client/README.md) for complete validator-side behavior, certificate handling, public APIs, and test helpers.
 

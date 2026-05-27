@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import cast
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from ecies.keys import PrivateKey as EciesPrivateKey
 
+from bt_ddos_shield_client import ed25519_ecies
 from bt_ddos_shield_client.types import PrivateKey, PublicKey
+
 
 class CertificateAlgorithmEnum(enum.IntEnum):
     ED25519 = 1
@@ -22,14 +23,12 @@ class Certificate:
 
 
 class EDDSACertificateManager:
-    _CURVE: Literal['ed25519'] = 'ed25519'
-
     @classmethod
     def generate_certificate(cls) -> Certificate:
-        ecies_private_key = EciesPrivateKey(cls._CURVE)
+        private_key = ed25519_ecies.generate_private_key_hex()
         return Certificate(
-            private_key=ecies_private_key.to_hex(),
-            public_key=ecies_private_key.public_key.to_hex(),
+            private_key=private_key,
+            public_key=ed25519_ecies.public_key_from_private_key(private_key),
             algorithm=CertificateAlgorithmEnum.ED25519,
         )
 
@@ -54,10 +53,9 @@ class EDDSACertificateManager:
             'ed25519.Ed25519PrivateKey',
             serialization.load_pem_private_key(private_key_raw, password=None),
         )
-        private_key_bytes = private_key.private_bytes_raw()
-        ecies_private_key = EciesPrivateKey.from_hex(cls._CURVE, private_key_bytes.hex())
+        private_key_hex = private_key.private_bytes_raw().hex()
         return Certificate(
-            private_key=ecies_private_key.to_hex(),
-            public_key=ecies_private_key.public_key.to_hex(),
+            private_key=private_key_hex,
+            public_key=ed25519_ecies.public_key_from_private_key(private_key_hex),
             algorithm=CertificateAlgorithmEnum.ED25519,
         )
