@@ -1,9 +1,7 @@
 from .shield_metagraph import ShieldMetagraph as ShieldMetagraph
-from .testing import ShieldMetagraphTestRig as ShieldMetagraphTestRig
-from .testing import ShieldedNeuronMutatorTestRig as ShieldedNeuronMutatorTestRig
+from .testing import ShieldTestRig as ShieldTestRig
 
 __all__ = [
     'ShieldMetagraph',
-    'ShieldMetagraphTestRig',
-    'ShieldedNeuronMutatorTestRig',
+    'ShieldTestRig',
 ]

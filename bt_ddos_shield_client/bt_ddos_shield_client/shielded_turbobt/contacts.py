@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import weakref
 
 import turbobt
 import turbobt.neuron
@@ -10,6 +11,9 @@ import turbobt.subnet
 from bt_ddos_shield_client.certificates import CertificateAlgorithmEnum
 from bt_ddos_shield_client.internal import decode_subtensor_certificate_info
 from bt_ddos_shield_client.types import PublicKey
+
+
+_real_turbo_bittensor_subtensor_contacts = weakref.WeakSet()
 
 
 class AbstractTurboBittensorSubtensorContact(ABC):
@@ -47,6 +51,9 @@ class AbstractTurboBittensorSubtensorContact(ABC):
 
 
 class TurboBittensorSubtensorContact(AbstractTurboBittensorSubtensorContact):
+
+    def __init__(self) -> None:
+        _real_turbo_bittensor_subtensor_contacts.add(self)
 
     async def list_neurons(
         self,
@@ -115,6 +122,7 @@ class MockTurboBittensorSubtensorContact(AbstractTurboBittensorSubtensorContact)
     own_public_key: PublicKey | None = None
     own_public_key_exception: Exception | None = None
     upload_exception: Exception | None = None
+    expected_hotkey: str | None = None
     listed_neurons: list[turbobt.neuron.Neuron] = field(default_factory=list)
     calls: list[TurboBittensorContactCall] = field(default_factory=list)
 
@@ -159,6 +167,10 @@ class MockTurboBittensorSubtensorContact(AbstractTurboBittensorSubtensorContact)
         netuid: int,
         hotkey: str,
     ) -> PublicKey | None:
+        if self.expected_hotkey is not None:
+            assert hotkey == self.expected_hotkey, (
+                f'expected validator hotkey {self.expected_hotkey}, got {hotkey}'
+            )
         self.calls.append(
             TurboBittensorContactCall(
                 method='get_own_public_key',
@@ -179,6 +191,11 @@ class MockTurboBittensorSubtensorContact(AbstractTurboBittensorSubtensorContact)
         netuid: int,
         wallet,
     ) -> None:
+        if self.expected_hotkey is not None:
+            assert wallet.hotkey.ss58_address == self.expected_hotkey, (
+                f'expected validator wallet hotkey {self.expected_hotkey}, '
+                f'got {wallet.hotkey.ss58_address}'
+            )
         self.calls.append(
             TurboBittensorContactCall(
                 method='upload_public_key',

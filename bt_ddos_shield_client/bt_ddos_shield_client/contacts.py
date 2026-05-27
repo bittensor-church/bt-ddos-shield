@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import asyncio
 from dataclasses import dataclass, field
 from typing import Protocol
+import weakref
 
 from bittensor import Subtensor
 from bittensor.core.chain_data import NeuronInfo
@@ -13,6 +14,9 @@ from bittensor.core.metagraph import Metagraph
 from bt_ddos_shield_client.certificates import CertificateAlgorithmEnum
 from bt_ddos_shield_client.internal import decode_subtensor_certificate_info
 from bt_ddos_shield_client.types import PublicKey
+
+
+_real_bittensor_subtensor_contacts = weakref.WeakSet()
 
 
 class CertificateContact(Protocol):
@@ -71,6 +75,9 @@ class AbstractBittensorSubtensorContact(ABC):
 
 
 class BittensorSubtensorContact(AbstractBittensorSubtensorContact):
+
+    def __init__(self) -> None:
+        _real_bittensor_subtensor_contacts.add(self)
 
     def sync_metagraph(
         self,
@@ -180,6 +187,7 @@ class MockBittensorSubtensorContact(AbstractBittensorSubtensorContact):
     own_public_key: PublicKey | None = None
     own_public_key_exception: Exception | None = None
     upload_exception: Exception | None = None
+    expected_hotkey: str | None = None
     sync_neurons: list[NeuronInfo] = field(default_factory=list)
     calls: list[BittensorContactCall] = field(default_factory=list)
 
@@ -229,6 +237,10 @@ class MockBittensorSubtensorContact(AbstractBittensorSubtensorContact):
         netuid: int,
         hotkey: str,
     ) -> PublicKey | None:
+        if self.expected_hotkey is not None:
+            assert hotkey == self.expected_hotkey, (
+                f'expected validator hotkey {self.expected_hotkey}, got {hotkey}'
+            )
         self.calls.append(
             BittensorContactCall(
                 method='get_own_public_key',
@@ -249,6 +261,11 @@ class MockBittensorSubtensorContact(AbstractBittensorSubtensorContact):
         wallet,
         netuid: int,
     ) -> None:
+        if self.expected_hotkey is not None:
+            assert wallet.hotkey.ss58_address == self.expected_hotkey, (
+                f'expected validator wallet hotkey {self.expected_hotkey}, '
+                f'got {wallet.hotkey.ss58_address}'
+            )
         self.calls.append(
             BittensorContactCall(
                 method='upload_public_key',

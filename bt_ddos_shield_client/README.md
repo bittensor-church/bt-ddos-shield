@@ -6,8 +6,7 @@ Standalone validator-side client package for BT DDoS Shield.
 
 - `bt_ddos_shield_client.ShieldMetagraph`
 - `bt_ddos_shield_client.shielded_turbobt.ShieldedNeuronMutator`
-- `bt_ddos_shield_client.ShieldMetagraphTestRig`
-- `bt_ddos_shield_client.ShieldedNeuronMutatorTestRig`
+- `bt_ddos_shield_client.ShieldTestRig`
 
 ## Behavior
 
