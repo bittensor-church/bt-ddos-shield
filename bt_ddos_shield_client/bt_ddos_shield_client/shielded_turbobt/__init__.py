@@ -3,5 +3,4 @@ from .contacts import MockTurboBittensorSubtensorContact as MockTurboBittensorSu
 
 __all__ = [
     'ShieldedNeuronMutator',
-    'MockTurboBittensorSubtensorContact',
 ]
