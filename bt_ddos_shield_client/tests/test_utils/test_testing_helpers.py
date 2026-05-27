@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import builtins
+
 import bittensor
 import pytest
 
@@ -30,7 +32,7 @@ def test_shield_test_rig_rewrites_bittensor_neurons_for_app_code(validator_walle
 async def test_shield_test_rig_rewrites_turbobt_neurons_for_app_code(validator_wallet: bittensor.wallet):
     pytest.importorskip('turbobt')
 
-    rig = ShieldTestRig(wallet=validator_wallet)
+    rig = ShieldTestRig(wallet=validator_wallet, with_turbobt=True)
     rig.add_miner('miner-a', '198.51.100.20', 8090, shield_address='203.0.113.20:3040')
     rig.add_miner('miner-b', '198.51.100.21', 8091, shield_address=None)
 
@@ -55,3 +57,41 @@ def test_shield_test_rig_rejects_real_contact_created_before_install(validator_w
     with pytest.raises(AssertionError, match='Real subtensor contact was already instantiated'):
         with rig.install():
             pass
+
+
+def test_shield_test_rig_screams_when_turbobt_mode_needs_missing_dependency(
+    validator_wallet: bittensor.wallet,
+    monkeypatch,
+):
+    real_import = builtins.__import__
+
+    def reject_turbobt(name, *args, **kwargs):
+        if name == 'turbobt' or name.startswith('turbobt.'):
+            raise ImportError('simulated missing turbobt')
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', reject_turbobt)
+    rig = ShieldTestRig(wallet=validator_wallet, with_turbobt=True)
+
+    with pytest.raises(RuntimeError, match='ShieldTestRig with_turbobt=True requires turbobt'):
+        with rig.install():
+            pass
+
+
+def test_shield_test_rig_false_turbobt_mode_does_not_need_turbobt(
+    validator_wallet: bittensor.wallet,
+    monkeypatch,
+):
+    real_import = builtins.__import__
+
+    def reject_turbobt(name, *args, **kwargs):
+        if name == 'turbobt' or name.startswith('turbobt.'):
+            raise ImportError('simulated missing turbobt')
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', reject_turbobt)
+    rig = ShieldTestRig(wallet=validator_wallet, with_turbobt=False)
+
+    with rig.install() as context:
+        assert context.bittensor is None
+        assert context.neurons == []

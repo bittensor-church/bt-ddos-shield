@@ -111,6 +111,7 @@ class ShieldTestRigContext:
 class ShieldTestRig:
     wallet: object
     netuid: int = 7
+    with_turbobt: bool = False
     miners: list[_MinerFixture] = field(default_factory=list)
 
     def add_miner(self, hotkey: str, ip: str, port: int, *, shield_address: str | None) -> None:
@@ -162,6 +163,8 @@ class ShieldTestRig:
                 'Real subtensor contact was already instantiated before test rig install. '
                 'Install the rig before calling sync/mutate_neurons/listing code.'
             )
+        if not self.with_turbobt:
+            return
         try:
             from bt_ddos_shield_client.shielded_turbobt.contacts import _real_turbo_bittensor_subtensor_contacts
         except ImportError:
@@ -173,12 +176,18 @@ class ShieldTestRig:
             )
 
     def _install_turbobt(self, stack: ExitStack, validator_hotkey: str) -> tuple[object | None, list[object]]:
+        if not self.with_turbobt:
+            return None, []
+
         try:
             import turbobt
 
             from bt_ddos_shield_client.shielded_turbobt.contacts import MockTurboBittensorSubtensorContact
-        except ImportError:
-            return None, []
+        except ImportError as exc:
+            raise RuntimeError(
+                'ShieldTestRig with_turbobt=True requires turbobt. '
+                'Install bt_ddos_shield_client[turbobt] to use turbobt test rig support.'
+            ) from exc
 
         neurons = [
             _make_turbobt_neuron(

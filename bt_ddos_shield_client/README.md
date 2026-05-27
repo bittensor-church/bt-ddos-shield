@@ -90,3 +90,21 @@ mutator = ShieldedNeuronMutator(
 neurons = await bittensor.subnet(netuid).list_neurons()
 await mutator.mutate_neurons(bittensor, neurons)
 ```
+
+For downstream app tests:
+
+```python
+from bt_ddos_shield_client import ShieldTestRig
+
+rig = ShieldTestRig(wallet=wallet)
+rig.add_miner("miner-a", "198.51.100.10", 8080, shield_address="203.0.113.10:3030")
+
+with rig.install():
+    run_validator_code()
+```
+
+Enable turbobt test support explicitly:
+
+```python
+rig = ShieldTestRig(wallet=wallet, with_turbobt=True)
+```
