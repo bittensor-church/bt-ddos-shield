@@ -2,12 +2,12 @@
 name = "manual-tests"
 version = "0.1.0"
 description = "Manual tests for bt ddos shield"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 dependencies = [
     "bittensor-cli",
     "bittensor",
     "dotenv",
-    "bt_ddos_shield_client[turbobt]",
+#    "bt_ddos_shield_client[turbobt]",
 ]
 
 [tool.uv.sources]

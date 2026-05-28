@@ -6,8 +6,8 @@ import pathlib
 import os
 
 from bt_ddos_shield_client import ShieldMetagraph
-from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
-from turbobt import Bittensor
+# from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
+# from turbobt import Bittensor
 
 
 from bittensor_wallet import bittensor_wallet
@@ -21,6 +21,7 @@ logging.basicConfig(
 )
 
 logging.getLogger("websockets").setLevel(logging.INFO)
+logging.getLogger("btdecode").setLevel(logging.INFO)
 
 load_dotenv(pathlib.Path(__file__).parent / '.env')
 
