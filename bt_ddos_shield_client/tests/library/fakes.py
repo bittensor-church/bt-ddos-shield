@@ -8,9 +8,6 @@ from types import SimpleNamespace
 
 from bittensor.core.chain_data import AxonInfo, NeuronInfo, PrometheusInfo
 from bittensor.utils.balance import Balance
-import turbobt
-from turbobt.neuron import AxonInfo as TurboAxonInfo
-from turbobt.neuron import AxonProtocolEnum, Neuron as TurboNeuron, PrometheusInfo as TurboPrometheusInfo
 
 from bt_ddos_shield_client.encryption import ECIESEncryptionManager
 
@@ -64,7 +61,12 @@ def make_turbobt_neuron(
     port: int,
     uid: int = 0,
     coldkey: str = 'miner-coldkey',
-) -> TurboNeuron:
+):
+    # Deferred so non-turbobt tests can import shared fakes on unsupported Python.
+    import turbobt
+    from turbobt.neuron import AxonInfo as TurboAxonInfo
+    from turbobt.neuron import AxonProtocolEnum, Neuron as TurboNeuron, PrometheusInfo as TurboPrometheusInfo
+
     return TurboNeuron(
         subnet=turbobt.Subnet(
             object(),

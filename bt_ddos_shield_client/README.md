@@ -114,7 +114,25 @@ rig = ShieldTestRig(wallet=wallet, with_turbobt=True)
 
 ## Tests
 
-Run the default client test suite from this directory:
+Run the default client test suite across every supported Python version from this directory:
+
+```bash
+uv tool run nox
+```
+
+Run one Python version with:
+
+```bash
+uv tool run nox -s tests-3.12
+```
+
+Pass pytest arguments after `--`:
+
+```bash
+uv tool run nox -s tests-3.12 -- tests/library -v
+```
+
+For a quick run against the current uv environment, use:
 
 ```bash
 uv run --group test pytest tests -v

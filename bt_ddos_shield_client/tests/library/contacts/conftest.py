@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import sys
+
 import pytest
-import turbobt
 
 from tests.library.contacts.local_subtensor import start_local_subtensor_env
 
@@ -40,4 +41,9 @@ def netuid(local_subtensor_env):
 
 @pytest.fixture
 def turbobt_bittensor(local_subtensor_env, validator_wallet):
+    if sys.platform and sys.version_info >= (3, 14):
+        turbobt = pytest.importorskip('turbobt', reason='turbobt is not available on this Python version')
+    else:
+        # Deferred so collecting integration fixtures does not require turbobt on unsupported Python.
+        import turbobt
     return turbobt.Bittensor(local_subtensor_env.ws_endpoint, wallet=validator_wallet)

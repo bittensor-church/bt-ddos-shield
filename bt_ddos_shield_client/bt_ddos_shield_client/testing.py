@@ -56,6 +56,7 @@ def _build_manifest_body(public_key: str, address: str, validator_hotkey: str) -
 
 
 def _make_turbobt_neuron(*, hotkey: str, ip: str, port: int, uid: int, netuid: int):
+    # Optional dependency import; base testing helpers must load without turbobt installed.
     import turbobt
     from turbobt.neuron import AxonInfo as TurboAxonInfo
     from turbobt.neuron import AxonProtocolEnum, Neuron as TurboNeuron, PrometheusInfo as TurboPrometheusInfo
@@ -121,6 +122,7 @@ class ShieldTestRig:
     def install(self):
         self._assert_no_real_contacts()
 
+        # Test-only dependency import; keep package import light for downstream users.
         from aioresponses import aioresponses
 
         certificate = ShieldClient(wallet=self.wallet).certificate
@@ -166,6 +168,7 @@ class ShieldTestRig:
         if not self.with_turbobt:
             return
         try:
+            # Optional dependency import; this guard only matters when turbobt support is requested.
             from bt_ddos_shield_client.shielded_turbobt.contacts import _real_turbo_bittensor_subtensor_contacts
         except ImportError:
             return
@@ -180,6 +183,7 @@ class ShieldTestRig:
             return None, []
 
         try:
+            # Optional dependency import; raise a focused error only when turbobt mode is used.
             import turbobt
 
             from bt_ddos_shield_client.shielded_turbobt.contacts import MockTurboBittensorSubtensorContact
@@ -230,6 +234,7 @@ class ShieldTestRig:
 
     @contextmanager
     def _patch(self, target: str, value):
+        # Local import keeps unittest.mock out of the normal package import path.
         from unittest.mock import patch
 
         with patch(target, value):

@@ -2,13 +2,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import sys
 from typing import Any
 
 import bittensor as bittensor_lib
-import turbobt
 
 from bt_ddos_shield_client.shield_metagraph import ShieldMetagraph
-from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
+
+_TURBOBT_AVAILABLE = not (sys.platform and sys.version_info >= (3, 14))
+
+if _TURBOBT_AVAILABLE:
+    # Optional integration import; the turbobt extra is not installed on Python 3.14.
+    import turbobt
+
+    from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
 
 
 @dataclass(frozen=True)
@@ -45,13 +52,15 @@ shield_metagraph = ShieldMetagraph(
     sync=False,
 )
 
-shielded_neuron_mutator = ShieldedNeuronMutator(
-    wallet=wallet,
-    netuid=_config.netuid,
-)
 
-bittensor = turbobt.Bittensor(_config.network, wallet=wallet)
-subnet = bittensor.subnet(_config.netuid)
+if _TURBOBT_AVAILABLE:
+    shielded_neuron_mutator = ShieldedNeuronMutator(
+        wallet=wallet,
+        netuid=_config.netuid,
+    )
+
+    bittensor = turbobt.Bittensor(_config.network, wallet=wallet)
+    subnet = bittensor.subnet(_config.netuid)
 
 
 def list_bittensor_neurons() -> list[Any]:
@@ -60,5 +69,7 @@ def list_bittensor_neurons() -> list[Any]:
 
 
 async def list_turbobt_neurons() -> list[Any]:
+    if not _TURBOBT_AVAILABLE:
+        raise RuntimeError('turbobt is not available on this Python version')
     neurons = await subnet.list_neurons()
     return await shielded_neuron_mutator.mutate_neurons(bittensor, neurons)

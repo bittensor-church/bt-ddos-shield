@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from bt_ddos_shield_client.certificates import EDDSACertificateManager
+
+if sys.platform and sys.version_info >= (3, 14):
+    pytest.importorskip('turbobt', reason='turbobt is not available on this Python version')
+
 from bt_ddos_shield_client.shielded_turbobt.contacts import TurboBittensorSubtensorContact
 
 

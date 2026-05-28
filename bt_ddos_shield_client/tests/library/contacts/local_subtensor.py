@@ -168,6 +168,7 @@ def _resolve_docker_host() -> str | None:
 
 def start_local_subtensor_env() -> LocalSubtensorEnv:
     _resolve_docker_host()
+    # Integration-only dependency import; default unit tests should not require testcontainers.
     from testcontainers.core.container import DockerContainer
 
     container = DockerContainer(LOCAL_SUBTENSOR_IMAGE)

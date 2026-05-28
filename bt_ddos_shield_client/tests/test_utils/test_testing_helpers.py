@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 import builtins
+import sys
 
 import bittensor
 import pytest
 
 from bt_ddos_shield_client.testing import ShieldTestRig
-from tests.test_utils.example_validator_code import validator
+
+
+def _validator_module():
+    # Deferred so test setup can patch validator environment before module load.
+    from tests.test_utils.example_validator_code import validator
+
+    return validator
 
 
 def test_shield_test_rig_rewrites_bittensor_neurons_for_app_code(validator_wallet: bittensor.wallet):
+    validator = _validator_module()
     rig = ShieldTestRig(wallet=validator_wallet)
     rig.add_miner('miner-a', '198.51.100.10', 8080, shield_address='203.0.113.10:3030')
     rig.add_miner('miner-b', '198.51.100.11', 8081, shield_address=None)
@@ -30,7 +38,9 @@ def test_shield_test_rig_rewrites_bittensor_neurons_for_app_code(validator_walle
 
 @pytest.mark.asyncio
 async def test_shield_test_rig_rewrites_turbobt_neurons_for_app_code(validator_wallet: bittensor.wallet):
-    pytest.importorskip('turbobt')
+    if sys.platform and sys.version_info >= (3, 14):
+        pytest.importorskip('turbobt', reason='turbobt is not available on this Python version')
+    validator = _validator_module()
 
     rig = ShieldTestRig(wallet=validator_wallet, with_turbobt=True)
     rig.add_miner('miner-a', '198.51.100.20', 8090, shield_address='203.0.113.20:3040')
@@ -47,6 +57,7 @@ async def test_shield_test_rig_rewrites_turbobt_neurons_for_app_code(validator_w
 
 
 def test_shield_test_rig_rejects_real_contact_created_before_install(validator_wallet: bittensor.wallet, monkeypatch):
+    # Import here so the test can reset the contact singleton before exercising the guard.
     import bt_ddos_shield_client.contacts as contacts
 
     monkeypatch.setattr(contacts, '_bittensor_subtensor_contact_instance', None)
