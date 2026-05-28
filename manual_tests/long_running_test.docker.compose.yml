@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  run_run_run:
+    image: ghcr.io/astral-sh/uv:python3.13-bookworm
+    working_dir: /opt/long_running_test/manual_tests
+    volumes:
+      - ./:/opt/long_running_test/
+      - "$HOME/.bittensor:/root/.bittensor:ro"
+    command: uv run continously_run_turbobt_shield.py
