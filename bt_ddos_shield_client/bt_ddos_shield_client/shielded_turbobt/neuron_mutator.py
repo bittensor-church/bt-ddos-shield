@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 
 import turbobt
@@ -9,6 +10,9 @@ from bt_ddos_shield_client.certificate_reconciliation import CertificateReconcil
 from bt_ddos_shield_client.client import ShieldClient
 from bt_ddos_shield_client.internal import parse_shield_address
 from bt_ddos_shield_client.shielded_turbobt.contacts import turbo_bittensor_subtensor_contact
+
+
+logger = logging.getLogger(__name__)
 
 
 class ShieldedNeuronMutator:
@@ -38,6 +42,7 @@ class ShieldedNeuronMutator:
         bittensor: turbobt.Bittensor,
         neurons: list[turbobt.neuron.Neuron],
     ) -> list[turbobt.neuron.Neuron]:
+        logger.debug("Ensuring on-chain certificate")
         await self._certificate_reconciler.ensure_own_certificate_matches(
             contact=self._get_contact(),
             client=bittensor,
@@ -46,6 +51,7 @@ class ShieldedNeuronMutator:
             wallet=self.wallet,
         )
         neurons_by_hotkey = self._neurons_by_hotkey(neurons)
+        logger.debug("Resolving shield addresses")
         shield_addresses = await self._shield_client.resolve_shield_addresses_by_hotkey(
             self.wallet.hotkey.ss58_address,
             {

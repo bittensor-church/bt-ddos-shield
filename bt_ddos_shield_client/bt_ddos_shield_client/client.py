@@ -5,6 +5,8 @@ from collections.abc import Mapping
 import os
 from pathlib import Path
 
+import aiohttp
+
 from bt_ddos_shield_client.certificates import Certificate, EDDSACertificateManager
 from bt_ddos_shield_client.encryption import ECIESEncryptionManager
 from bt_ddos_shield_client.manifest import JsonManifestSerializer, fetch_manifest, get_address_for_validator
@@ -35,6 +37,8 @@ class ShieldClient:
         self.encryption_manager = ECIESEncryptionManager()
         self.manifest_serializer = JsonManifestSerializer()
         self.certificate = self._load_or_create_certificate()
+        self._manifest_session: aiohttp.ClientSession | None = None
+        self._manifest_session_loop: asyncio.AbstractEventLoop | None = None
 
     def _load_or_create_certificate(self) -> Certificate:
         try:
@@ -51,11 +55,13 @@ class ShieldClient:
         axon_ip: str,
         axon_port: int,
     ) -> ShieldAddress | None:
+        session = self._get_manifest_session()
         manifest = await fetch_manifest(
             axon_ip,
             axon_port,
             timeout=self.manifest_timeout,
             serializer=self.manifest_serializer,
+            session=session,
         )
         if manifest is None:
             return None
@@ -105,3 +111,24 @@ class ShieldClient:
             miner_hotkey: shield_address
             for (miner_hotkey, _), shield_address in zip(miners.items(), resolved_addresses, strict=True)
         }
+
+    def _get_manifest_session(self) -> aiohttp.ClientSession:
+        loop = asyncio.get_running_loop()
+        if (
+            self._manifest_session is None
+            or self._manifest_session.closed
+            or self._manifest_session_loop is not loop
+            or self._manifest_session_loop.is_closed()
+        ):
+            self._manifest_session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.manifest_timeout),
+            )
+            self._manifest_session_loop = loop
+        return self._manifest_session
+
+    async def aclose(self) -> None:
+        session = self._manifest_session
+        self._manifest_session = None
+        self._manifest_session_loop = None
+        if session is not None and not session.closed:
+            await session.close()

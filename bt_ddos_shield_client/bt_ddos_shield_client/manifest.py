@@ -67,16 +67,16 @@ async def fetch_manifest(
     *,
     timeout: int = 10,
     serializer: JsonManifestSerializer | None = None,
+    session: aiohttp.ClientSession | None = None,
 ) -> Manifest | None:
     serializer = serializer or JsonManifestSerializer()
     url = build_manifest_url(axon_ip, axon_port)
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-            looger.debug(f"trying {axon_ip}")
-            async with session.get(url, allow_redirects=True) as response:
-                looger.debug(f"{axon_ip} response {response.status}")
-                response.raise_for_status()
-                raw_manifest = await response.read()
+        if session is None:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as owned_session:
+                raw_manifest = await _fetch_manifest_body(owned_session, url, axon_ip)
+        else:
+            raw_manifest = await _fetch_manifest_body(session, url, axon_ip)
     except Exception:
         looger.debug(f"failed to fetch manifest from {axon_ip}")
         return None
@@ -85,6 +85,15 @@ async def fetch_manifest(
     except ManifestDeserializationException:
         print(f"failed to deserialize manifest from {axon_ip}")
         return None
+
+
+async def _fetch_manifest_body(session: aiohttp.ClientSession, url: str, axon_ip: str) -> bytes:
+    looger.debug(f"trying {axon_ip}")
+    async with session.get(url, allow_redirects=True) as response:
+        looger.debug(f"{axon_ip} response {response.status}")
+        response.raise_for_status()
+        return await response.read()
+
 
 logger = logging.getLogger(__name__)
 def get_address_for_validator(

@@ -6,8 +6,8 @@ import pathlib
 import os
 
 from bt_ddos_shield_client import ShieldMetagraph
-# from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
-# from turbobt import Bittensor
+from bt_ddos_shield_client.shielded_turbobt import ShieldedNeuronMutator
+from turbobt import Bittensor
 
 
 from bittensor_wallet import bittensor_wallet
@@ -18,6 +18,7 @@ import logging
 logging.basicConfig(
     level=logging.DEBUG,
     force=True,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
 )
 
 logging.getLogger("websockets").setLevel(logging.INFO)
@@ -48,7 +49,9 @@ for neuron in gra.neurons:
     print(neuron.hotkey, neuron.axon_info.ip, neuron.axon_info.port)
 
 
+logger = logging.getLogger(__name__)
 async def main():
+    logger.debug("turbobt start")
     async with Bittensor(
         os.environ['SERVER_SHIELD_SUBTENSOR_ADDRESS'],
         wallet=bittensor_wallet.Wallet(os.environ['BITTENSOR_VALIDATOR_WALLET_NAME'], os.environ['BITTENSOR_VALIDATOR_WALLET_HOTKEY']),
@@ -58,6 +61,7 @@ async def main():
         sn = bittensor.subnet(netuid)
         for neuron in await mutator.mutate_neurons(bittensor, await sn.list_neurons()):
             print(neuron.hotkey, neuron.axon_info.ip, neuron.axon_info.port)
+        logger.debug("done")
 
 
 asyncio.run(main())
