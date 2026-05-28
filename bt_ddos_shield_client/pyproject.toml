@@ -30,7 +30,7 @@ test = [
 ]
 
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=64", "setuptools-scm>=8,<9"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
@@ -38,6 +38,10 @@ packages = [
     "bt_ddos_shield_client",
     "bt_ddos_shield_client.shielded_turbobt",
 ]
+
+[tool.setuptools_scm]
+root = ".."
+tag_regex = "^(?:draft/)?v(?P<version>.+)$"
 
 [tool.pytest.ini_options]
 addopts = '-s -m "not subtensor_integration"'

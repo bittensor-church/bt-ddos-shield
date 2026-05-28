@@ -66,8 +66,6 @@ jobs:
       #  continue-on-error: ${{ fromJSON(steps.get-version.outputs.draft) }}
 
       - name: Build
-        env:
-          VERSION: ${{ steps.get-version.outputs.version }}
         working-directory: bt_ddos_shield_client
         run: uv build
 
