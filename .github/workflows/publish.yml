@@ -132,6 +132,8 @@ jobs:
             backenddevelopersltd/bt-ddos-shield-server:git-${{ github.sha }}
   docker-draft-build:
     runs-on: ubuntu-latest
+    needs: publish
+    if: ${{ needs.publish.outputs.draft == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -145,5 +147,5 @@ jobs:
           push: false
           tags: |
             backenddevelopersltd/bt-ddos-shield-server:latest
-            backenddevelopersltd/bt-ddos-shield-server:tararara
+            backenddevelopersltd/bt-ddos-shield-server:${{ needs.publish.outputs.version }}
             backenddevelopersltd/bt-ddos-shield-server:git-${{ github.sha }}
