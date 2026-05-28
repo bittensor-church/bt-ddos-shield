@@ -59,6 +59,16 @@ See the [client README](bt_ddos_shield_client/README.md) for complete validator-
 
 The miner-side server shield is distributed as a Docker image built from `server_shield/Dockerfile`. It provisions an AWS-backed shield for a miner running on EC2, using Route 53, S3, WAF, an internal ALB, and an internet-facing NLB.
 
+It requires around 2gb of RAM to run. An initial may take up to 5 minutes, the network related infra should be 
+accessible after an additional 5 minutes. If left running, the shield server will keep scanning the subnet and updating
+the infra as needed.
+
+Currently, the shielded miner has to be hosted in AWS, i.e. this shield server can only provision infra to protect EC2 
+instances. PRs adding capabilities for other cloud providers are welcome.
+
+WARNING: make sure to properly configure the miner port when starting the shield server, changing it unsupported right 
+now. In case of mistake you will have to destroy the Pulumi infra and create it anew.
+
 ### Requirements
 
 - AWS credentials that can manage the required EC2, ELBv2, WAFv2, Route 53, and S3 resources.
@@ -143,7 +153,9 @@ docker run \
   --env-file .env \
   --volume server-shield-pulumi-state:/var/lib/server-shield/pulumi-state \
   --volume /opt/bittensor-ddos-shield/state:/var/lib/server-shield/state \
-  server-shield:local
+  --volume ~/.bittensor/wallets:/root/.bittensor/wallets \
+  --restart unless-stopped \
+  backenddevelopersltd/bt-ddos-shield-server
 ```
 
 With an S3 Pulumi backend:
@@ -156,7 +168,9 @@ SERVER_SHIELD_PULUMI__BACKEND_URL=s3://my-pulumi-state-bucket/server-shield
 docker run \
   --env-file .env \
   --volume /opt/bittensor-ddos-shield/state:/var/lib/server-shield/state \
-  server-shield:local
+  --volume ~/.bittensor/wallets:/root/.bittensor/wallets \
+  --restart unless-stopped \
+  backenddevelopersltd/bt-ddos-shield-server
 ```
 
 For local file backends, persist `/var/lib/server-shield/pulumi-state`. For S3 backends, create the bucket ahead of container startup.
