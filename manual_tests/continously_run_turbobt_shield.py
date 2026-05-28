@@ -30,12 +30,6 @@ vali_wallet = bittensor_wallet.Wallet(
     os.environ['BITTENSOR_VALIDATOR_WALLET_HOTKEY'],
 )
 
-# miner_wallet = bittensor_wallet.Wallet(
-#     os.environ['SERVER_SHIELD_CHAIN_WRITER__WALLET_NAME'],
-#     os.environ['SERVER_SHIELD_CHAIN_WRITER__WALLET_HOTKEY'],
-# )
-
-
 logger = logging.getLogger(__name__)
 async def main():
     logger.debug("turbobt start")
