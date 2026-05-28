@@ -46,5 +46,5 @@ while True:
     gra.sync()
     for neuron in gra.neurons:
         print(neuron.hotkey, neuron.axon_info.ip, neuron.axon_info.port)
-        print(gra.block)
+    print(gra.block)
     time.sleep(12)
