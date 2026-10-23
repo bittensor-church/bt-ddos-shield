@@ -18,6 +18,8 @@ jobs:
   publish:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # uv build and uvx ignore releases uploaded after this date, so a freshly published malicious release cannot run here.
+      UV_EXCLUDE_NEWER: "2026-10-16T00:00:00Z"
     permissions:
       id-token: write  # allows publishing to PyPI
       contents: write  # allows uploading a GitHub release
@@ -73,7 +75,14 @@ jobs:
 
       - name: Sign distribution
         working-directory: bt_ddos_shield_client
-        run: uv run --project ../.github/sigstore --locked sigstore sign dist/*.tar.gz dist/*.whl
+        # certifi 2026.10.19 is the first release without the compromised eMudhra/emSign roots;
+        # sigstore does not require it.
+        run: >-
+          uvx
+          --exclude-newer-package sigstore=2026-10-21T00:00:00Z
+          --exclude-newer-package certifi=2026-10-21T00:00:00Z
+          --from sigstore==4.5.1 --with "certifi>=2026.10.19"
+          sigstore sign dist/*.tar.gz dist/*.whl
 
       - name: Create GitHub release
         id: create-release
