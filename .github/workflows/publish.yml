@@ -18,6 +18,8 @@ jobs:
   publish:
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # uv build and uvx ignore releases uploaded after this date, so a freshly published malicious release cannot run here.
+      UV_EXCLUDE_NEWER: "2026-10-16T00:00:00Z"
     permissions:
       id-token: write  # allows publishing to PyPI
       contents: write  # allows uploading a GitHub release
@@ -51,7 +53,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.4"
+          # SHA-256 of uv-x86_64-unknown-linux-gnu.tar.gz from the uv release.
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
           enable-cache: true
 
       #- name: Install dependencies
@@ -70,11 +74,15 @@ jobs:
         run: uv build
 
       - name: Sign distribution
-        uses: sigstore/gh-action-sigstore-python@v3.0.0
-        with:
-          inputs: >-
-            bt_ddos_shield_client/dist/*.tar.gz
-            bt_ddos_shield_client/dist/*.whl
+        working-directory: bt_ddos_shield_client
+        # certifi 2026.10.19 is the first release without the compromised eMudhra/emSign roots;
+        # sigstore does not require it.
+        run: >-
+          uvx
+          --exclude-newer-package sigstore=2026-10-21T00:00:00Z
+          --exclude-newer-package certifi=2026-10-21T00:00:00Z
+          --from sigstore==4.5.1 --with "certifi>=2026.10.19"
+          sigstore sign dist/*.tar.gz dist/*.whl
 
       - name: Create GitHub release
         id: create-release
@@ -125,6 +133,8 @@ jobs:
         with:
           context: .
           file: ./server_shield/Dockerfile
+          pull: true
+          no-cache: true
           push: true
           tags: |
             backenddevelopersltd/bt-ddos-shield-server:latest
@@ -144,6 +154,8 @@ jobs:
         with:
           context: .
           file: ./server_shield/Dockerfile
+          pull: true
+          no-cache: true
           push: false
           tags: |
             backenddevelopersltd/bt-ddos-shield-server:latest
