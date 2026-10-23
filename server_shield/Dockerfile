@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 ARG PULUMI_VERSION=3.271.0
 ARG PULUMI_SHA256_AMD64=48b92e1584cf10649e43add7b4750e8be71231976f0cf25c94148a7ed254a01f
 ARG PULUMI_SHA256_ARM64=d8889833c6cfd8e1393e765f85891fd93af47651c1db08c54a11750b5c11df1c
-# Keep equal to pulumi-aws in uv.lock, otherwise Pulumi downloads the locked version unverified at runtime.
+# Must equal pulumi-aws in uv.lock; the build fails otherwise.
 ARG PULUMI_AWS_PLUGIN_VERSION=7.23.0
 ARG PULUMI_AWS_PLUGIN_SHA256_AMD64=f5c585152bbacf11a0c02376ade122b7e74095e9b2f98dd291cbec1d880e7b4c
 ARG PULUMI_AWS_PLUGIN_SHA256_ARM64=c6070f8d8ae740e617dd8e7de974b39d9f27d4f9703ec67b5413932572034592
@@ -16,6 +16,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/root/.pulumi/bin:/app/.venv/bin:${PATH}"
+# Pulumi would otherwise download a missing plugin at runtime without checking its digest.
+ENV PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION=true
 RUN set -eu; \
     arch="$(dpkg --print-architecture)"; \
     case "${arch}" in \
@@ -41,6 +43,12 @@ RUN python -m pip uninstall --yes pip
 
 COPY server_shield /app
 RUN uv sync --frozen --group dev
+RUN set -eu; \
+    locked="$(python -c 'import importlib.metadata; print(importlib.metadata.version("pulumi-aws"))')"; \
+    if [ "${locked}" != "${PULUMI_AWS_PLUGIN_VERSION}" ]; then \
+        echo "PULUMI_AWS_PLUGIN_VERSION is ${PULUMI_AWS_PLUGIN_VERSION}, but uv.lock has pulumi-aws ${locked}; update the ARG and its digests." >&2; \
+        exit 1; \
+    fi
 COPY server_shield/docker/shield-pulumi /usr/local/bin/shield-pulumi
 RUN chmod +x /app/docker/run_component.sh /app/docker/entrypoint.sh /usr/local/bin/shield-pulumi
 
