@@ -35,9 +35,9 @@ RUN set -eu; \
     pulumi plugin install resource aws "${PULUMI_AWS_PLUGIN_VERSION}" --file /tmp/pulumi-resource-aws.tar.gz; \
     rm /tmp/pulumi.tar.gz /tmp/pulumi-resource-aws.tar.gz
 
-COPY --from=ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b /uv /bin/
 # uv installs the Python packages, so pip and the certifi bundle it vendors are not needed.
-RUN python -m pip uninstall --yes pip && rm -f /usr/local/bin/pip
+RUN python -m pip uninstall --yes pip
 
 COPY server_shield /app
 RUN uv sync --frozen --group dev
