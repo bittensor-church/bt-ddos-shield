@@ -73,7 +73,7 @@ jobs:
 
       - name: Sign distribution
         working-directory: bt_ddos_shield_client
-        run: uvx --from sigstore==4.5.1 --with "certifi>=2026.10.19" sigstore sign dist/*.tar.gz dist/*.whl
+        run: uv run --project ../.github/sigstore --locked sigstore sign dist/*.tar.gz dist/*.whl
 
       - name: Create GitHub release
         id: create-release

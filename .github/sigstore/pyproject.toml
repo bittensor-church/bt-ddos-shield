@@ -1,0 +1,16 @@
+# Signing tools for the publish workflow; uv.lock pins every dependency with its hash.
+[project]
+name = "release-signing"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "sigstore==4.5.1",
+    # The first release without the compromised eMudhra/emSign roots; sigstore does not require it.
+    "certifi>=2026.10.19",
+]
+
+[tool.uv]
+package = false
+# Lock only releases that have been public for at least a week, except the CA fixes.
+exclude-newer = "2026-10-16T00:00:00Z"
+exclude-newer-package = { sigstore = "2026-10-21T00:00:00Z", certifi = "2026-10-21T00:00:00Z" }
