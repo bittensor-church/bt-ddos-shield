@@ -51,7 +51,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
-          version: "latest"
+          version: "0.13.4"
+          # SHA-256 of uv-x86_64-unknown-linux-gnu.tar.gz from the uv release.
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
           enable-cache: true
 
       #- name: Install dependencies
@@ -70,11 +72,8 @@ jobs:
         run: uv build
 
       - name: Sign distribution
-        uses: sigstore/gh-action-sigstore-python@v3.0.0
-        with:
-          inputs: >-
-            bt_ddos_shield_client/dist/*.tar.gz
-            bt_ddos_shield_client/dist/*.whl
+        working-directory: bt_ddos_shield_client
+        run: uvx --from sigstore==4.5.1 --with "certifi>=2026.10.19" sigstore sign dist/*.tar.gz dist/*.whl
 
       - name: Create GitHub release
         id: create-release
@@ -125,6 +124,8 @@ jobs:
         with:
           context: .
           file: ./server_shield/Dockerfile
+          pull: true
+          no-cache: true
           push: true
           tags: |
             backenddevelopersltd/bt-ddos-shield-server:latest
@@ -144,6 +145,8 @@ jobs:
         with:
           context: .
           file: ./server_shield/Dockerfile
+          pull: true
+          no-cache: true
           push: false
           tags: |
             backenddevelopersltd/bt-ddos-shield-server:latest
